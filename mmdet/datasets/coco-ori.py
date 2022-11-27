@@ -22,193 +22,42 @@ from .custom import CustomDataset
 @DATASETS.register_module()
 class CocoDataset(CustomDataset):
 
-    # 20220328：total 140 classes
-    CLASSES = ("Baby diapers",
-               "Baby Furniture",
-               "Baby washing and nursing supplie",
-               "Baby slippers",          
-               "Baby handkerchiefs ",
-               "Baby crib",         
-               "Baby carriage",
-               "Baby tableware",
-               "Dairy",
-               "Cocktail",
-               "Red wine",
-               "Liquor and Spirits",
-               "Carbonated drinks",
-               "Herbal tea",
-               "Coffee",
-               "Tea beverage",
-               "Baby milk powder",
-               "Guozhen",
-               "Ginger Tea",             # DeleteClass 20191102
-               "Sour Plum Soup",            # DeleteClass 20191102  20
-               "Adult milk powder",
-               "Tea",
-               "Notebook",
-               "Pencil case",
-               "Pen",
-               "Baby Toys",
-               "Children Toys",
-               "Football",
-               "Rubber ball",           # DeleteClass 20191103
-               "Badminton",
-               "Basketball",
-               "Skate",
-               "Pasta",
-               "Noodle",
-               "Flour",
-               "Rise",
-               "Oats",
-               "Sesame paste",
-               "Soymilk",
-               "Lotus root flour",          # DeleteClass 20191103
-               "Walnut powder",
-               "Quick-frozen Tangyuan",
-               "Quick-frozen Wonton",
-               "Quick-frozen dumplings",
-               "Can",
-               "Instant noodles",
-               "Mixed congee",
-               "Potato chips",
-               "Dried meat",
-               #"Chicken claws",             # DeleteClass 20191103           20200114Del
-               "Hot strips",             # DeleteClass 20191103
-               "Dried fish",             # DeleteClass 20191103
-               "Dried beans",             # DeleteClass 20191103
-               "Fish tofu",             # DeleteClass 20191103
-               "Chocolates",
-               "Chewing gum",
-               "Cake",
-               "Pie",
-               "Biscuits",
-               # "Potatoes",    # DeleteClass 20191102           20200114Del
-               "Ice cream",
-               "Cooking wine",
-               "Soy sauce",
-               "Sauce",
-               "Vinegar",
-               "Care Kit",
-               "Shampoo",
-               "Hair conditioner",
-               "Hair gel",
-               "Hair dye",
-               "Comb",
-               "Tampon",
-               "Cotton swab",
-               "Band aid",
-               "Adult Diapers",
-               "Bath lotion",
-               "Soap",                 # DeleteClass 20191102
-               # "Flower dew",           # DeleteClass 20191102  10       20200114Del
-               "Emulsion",             
-               "Facial Cleanser",
-               "Razor",
-               "Facial mask",
-               "Skin care set",
-               "Toothbrush",
-               # "Dental floss bar",        # DeleteClass 20191102       20200114Del
-               "Toothpaste",
-               "Mouth wash",
-               "Makeup tools",
-               "Jacket",
-               "Trousers",
-               "Adult shoes",
-               "Adult socks",
-               "Children shoes",
-               "Children Socks",
-               "Children hats",
-               "Children underwear",             # DeleteClass 20191103
-               "Lingerie",
-               "Men underwear",
-               "Adult hat",
-               "Bedding set",
-               "Juicer",
-               "Washing machine",
-               "Microwave Oven",
-               "Desk lamp",
-               "Air conditioning fan",    
-               "Air conditioner",
-               "Soybean Milk machine",
-               "Electric iron",
-               "Electric kettle",
-               # "Pressure cooker",            # DeleteClass 20191102       20200114Del
-               "Television",
-               "Electric Hot pot",
-               "Electric fan",
-               "Rice cooker",
-               "Electromagnetic furnace",
-               "Electric frying pan",
-               "Electric steaming pan",             # DeleteClass 20191103
-               "Hair drier",                
-               "Socket",
-               "Refrigerator",
-               "Coat hanger",
-               "Sports cup",
-               "Disposable cups",
-               "Thermos bottle",
-               "Basin",
-               "Mug",
-               "Draw bar box",
-               "Trash",
-               "Disposable bag",
-               "Storage box",
-               "Storage bottle",
-               "Stool",     # NewClass20191010
-               # "Package",     # DeleteClass 20191102       20200114Del
-               "Knapsack",
-               "Chopping block",
-               "Food box",
-               "Spoon",             # DeleteClass 20191103
-               "Chopsticks",
-               "Bowl",     # NewClass20191010
-               "Pot shovel",
-               "Soup ladle",
-               "Cutter",             # DeleteClass 20191103
-               # "Oil brush", #DeleteClass20191027
-               "Knives",       # DeleteClass 20191102
-               "Forks",
-               "Dinner plate",
-               "Fresh-keeping film"
-               # "Fresh-keeping bag"   # DeleteClass 20191102               20200114Del
-               )
+    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+               'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+               'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+               'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+               'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+               'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+               'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+               'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+               'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+               'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+               'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+               'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
+               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
+               'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
 
-#     CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-#                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
-#                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-#                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-#                'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-#                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-#                'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-#                'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-#                'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-#                'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-#                'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-#                'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
-#                'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-#                'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
-
-#     PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
-#                (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
-#                (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
-#                (175, 116, 175), (250, 0, 30), (165, 42, 42), (255, 77, 255),
-#                (0, 226, 252), (182, 182, 255), (0, 82, 0), (120, 166, 157),
-#                (110, 76, 0), (174, 57, 255), (199, 100, 0), (72, 0, 118),
-#                (255, 179, 240), (0, 125, 92), (209, 0, 151), (188, 208, 182),
-#                (0, 220, 176), (255, 99, 164), (92, 0, 73), (133, 129, 255),
-#                (78, 180, 255), (0, 228, 0), (174, 255, 243), (45, 89, 255),
-#                (134, 134, 103), (145, 148, 174), (255, 208, 186),
-#                (197, 226, 255), (171, 134, 1), (109, 63, 54), (207, 138, 255),
-#                (151, 0, 95), (9, 80, 61), (84, 105, 51), (74, 65, 105),
-#                (166, 196, 102), (208, 195, 210), (255, 109, 65), (0, 143, 149),
-#                (179, 0, 194), (209, 99, 106), (5, 121, 0), (227, 255, 205),
-#                (147, 186, 208), (153, 69, 1), (3, 95, 161), (163, 255, 0),
-#                (119, 0, 170), (0, 182, 199), (0, 165, 120), (183, 130, 88),
-#                (95, 32, 0), (130, 114, 135), (110, 129, 133), (166, 74, 118),
-#                (219, 142, 185), (79, 210, 114), (178, 90, 62), (65, 70, 15),
-#                (127, 167, 115), (59, 105, 106), (142, 108, 45), (196, 172, 0),
-#                (95, 54, 80), (128, 76, 255), (201, 57, 1), (246, 0, 122),
-#                (191, 162, 208)]
+    PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
+               (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
+               (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
+               (175, 116, 175), (250, 0, 30), (165, 42, 42), (255, 77, 255),
+               (0, 226, 252), (182, 182, 255), (0, 82, 0), (120, 166, 157),
+               (110, 76, 0), (174, 57, 255), (199, 100, 0), (72, 0, 118),
+               (255, 179, 240), (0, 125, 92), (209, 0, 151), (188, 208, 182),
+               (0, 220, 176), (255, 99, 164), (92, 0, 73), (133, 129, 255),
+               (78, 180, 255), (0, 228, 0), (174, 255, 243), (45, 89, 255),
+               (134, 134, 103), (145, 148, 174), (255, 208, 186),
+               (197, 226, 255), (171, 134, 1), (109, 63, 54), (207, 138, 255),
+               (151, 0, 95), (9, 80, 61), (84, 105, 51), (74, 65, 105),
+               (166, 196, 102), (208, 195, 210), (255, 109, 65), (0, 143, 149),
+               (179, 0, 194), (209, 99, 106), (5, 121, 0), (227, 255, 205),
+               (147, 186, 208), (153, 69, 1), (3, 95, 161), (163, 255, 0),
+               (119, 0, 170), (0, 182, 199), (0, 165, 120), (183, 130, 88),
+               (95, 32, 0), (130, 114, 135), (110, 129, 133), (166, 74, 118),
+               (219, 142, 185), (79, 210, 114), (178, 90, 62), (65, 70, 15),
+               (127, 167, 115), (59, 105, 106), (142, 108, 45), (196, 172, 0),
+               (95, 54, 80), (128, 76, 255), (201, 57, 1), (246, 0, 122),
+               (191, 162, 208)]
 
     def load_annotations(self, ann_file):
         """Load annotation from COCO style annotation file.
@@ -307,7 +156,6 @@ class CocoDataset(CustomDataset):
         """
         gt_bboxes = []
         gt_labels = []
-        gt_counts = []  # 20220403 add
         gt_bboxes_ignore = []
         gt_masks_ann = []
         for i, ann in enumerate(ann_info):
@@ -327,18 +175,15 @@ class CocoDataset(CustomDataset):
                 gt_bboxes_ignore.append(bbox)
             else:
                 gt_bboxes.append(bbox)
-                gt_counts.append(ann['count'])  # 20220403 add
                 gt_labels.append(self.cat2label[ann['category_id']])
                 gt_masks_ann.append(ann.get('segmentation', None))
 
         if gt_bboxes:
             gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
             gt_labels = np.array(gt_labels, dtype=np.int64)
-            gt_counts = np.array(gt_counts, dtype=np.int64)  # 20220403 add
         else:
             gt_bboxes = np.zeros((0, 4), dtype=np.float32)
             gt_labels = np.array([], dtype=np.int64)
-            gt_counts = np.array([], dtype=np.int64)  # 20220403 add
 
         if gt_bboxes_ignore:
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
@@ -350,7 +195,6 @@ class CocoDataset(CustomDataset):
         ann = dict(
             bboxes=gt_bboxes,
             labels=gt_labels,
-            counts=gt_counts,  # 20220403 add
             bboxes_ignore=gt_bboxes_ignore,
             masks=gt_masks_ann,
             seg_map=seg_map)
