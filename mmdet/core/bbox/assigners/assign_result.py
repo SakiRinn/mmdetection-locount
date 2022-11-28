@@ -204,3 +204,42 @@ class AssignResult(util_mixins.NiceRepr):
 
         if self.labels is not None:
             self.labels = torch.cat([gt_labels, self.labels])
+
+
+class AssignResultWithCount(util_mixins.NiceRepr):
+
+    def __init__(self, num_gts, gt_inds, max_overlaps, labels=None, counts=None):
+        self.num_gts = num_gts
+        self.gt_inds = gt_inds
+        self.max_overlaps = max_overlaps
+        self.labels = labels
+        self.counts = counts
+        # Interface for possible user-defined properties
+        self._extra_properties = {}
+
+    @property
+    def info(self):
+        """dict: a dictionary of info about the object"""
+        basic_info = {
+            'num_gts': self.num_gts,
+            'num_preds': self.num_preds,
+            'gt_inds': self.gt_inds,
+            'max_overlaps': self.max_overlaps,
+            'labels': self.labels,
+            'counts': self.counts,
+        }
+        basic_info.update(self._extra_properties)
+        return basic_info
+
+    def add_gt_(self, gt_labels, gt_counts):
+        self_inds = torch.arange(
+            1, len(gt_labels) + 1, dtype=torch.long, device=gt_labels.device)
+        self.gt_inds = torch.cat([self_inds, self.gt_inds])
+
+        self.max_overlaps = torch.cat(
+            [self.max_overlaps.new_ones(len(gt_labels)), self.max_overlaps])
+
+        if self.labels is not None:
+            self.labels = torch.cat([gt_labels, self.labels])
+        if self.counts is not None:
+            self.counts = torch.cat([gt_counts, self.counts])

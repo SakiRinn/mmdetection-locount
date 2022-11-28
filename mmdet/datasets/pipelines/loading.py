@@ -230,6 +230,7 @@ class LoadAnnotations:
                  with_label=True,
                  with_mask=False,
                  with_seg=False,
+                 with_count=True,
                  poly2mask=True,
                  denorm_bbox=False,
                  file_client_args=dict(backend='disk')):
@@ -237,6 +238,7 @@ class LoadAnnotations:
         self.with_label = with_label
         self.with_mask = with_mask
         self.with_seg = with_seg
+        self.with_count = with_count    # NOTE: 20221129 - add count
         self.poly2mask = poly2mask
         self.denorm_bbox = denorm_bbox
         self.file_client_args = file_client_args.copy()
@@ -285,6 +287,7 @@ class LoadAnnotations:
         """
 
         results['gt_labels'] = results['ann_info']['labels'].copy()
+        results['gt_counts'] = results['ann_info']['counts'].copy()
         return results
 
     def _poly2mask(self, mask_ann, img_h, img_w):
@@ -377,6 +380,11 @@ class LoadAnnotations:
         results['seg_fields'].append('gt_semantic_seg')
         return results
 
+    def _load_counts(self, results):
+        # NOTE: 20221129 - Implement this function
+        results['gt_counts'] = results['ann_info']['counts'].copy()
+        return results
+
     def __call__(self, results):
         """Call function to load multiple types annotations.
 
@@ -398,6 +406,8 @@ class LoadAnnotations:
             results = self._load_masks(results)
         if self.with_seg:
             results = self._load_semantic_seg(results)
+        if self.with_count:     # NOTE: Use the new function
+            results = self._load_counts(results)
         return results
 
     def __repr__(self):

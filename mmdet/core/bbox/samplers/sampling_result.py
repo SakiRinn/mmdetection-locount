@@ -151,3 +151,37 @@ class SamplingResult(util_mixins.NiceRepr):
             rng=rng)
         self = sampler.sample(assign_result, bboxes, gt_bboxes, gt_labels)
         return self
+
+
+class SamplingResultWithCount(SamplingResult):
+
+    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
+                 gt_flags, gt_counts):
+        super(SamplingResultWithCount, self).__init__(pos_inds, neg_inds,
+                                                      bboxes, gt_bboxes, assign_result, gt_flags)
+
+        if assign_result.counts is not None:
+            self.pos_gt_counts = assign_result.counts[pos_inds]     # 0529 add
+            self.neg_gt_counts = assign_result.counts[neg_inds]
+            #print("sampling_result - assign_result.counts is not None, labels:", self.pos_gt_labels)
+        else:
+            self.pos_gt_counts = None                               # 0529 add
+            self.neg_gt_counts = None
+            #print("sampling_result - assign_result.counts is None, labels:", self.pos_gt_labels)
+
+        if assign_result.counts is None and assign_result.labels is not None:
+            print("sampling_result - assign_result.counts is None, labels:", self.pos_gt_labels)
+
+    @property
+    def info(self):
+        return {
+            'pos_inds': self.pos_inds,
+            'neg_inds': self.neg_inds,
+            'pos_bboxes': self.pos_bboxes,
+            'neg_bboxes': self.neg_bboxes,
+            'pos_is_gt': self.pos_is_gt,
+            'num_gts': self.num_gts,
+            'pos_assigned_gt_inds': self.pos_assigned_gt_inds,
+            'pos_gt_counts': self.pos_gt_counts,
+            'neg_gt_counts': self.neg_gt_counts,
+        }

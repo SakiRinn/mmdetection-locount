@@ -2,7 +2,7 @@
 from .atss import ATSS
 from .autoassign import AutoAssign
 from .base import BaseDetector
-from .cascade_rcnn import CascadeRCNN
+from .cascade_rcnn import CascadeRCNN, CascadeRCNNWithCount
 from .centernet import CenterNet
 from .cornernet import CornerNet
 from .ddod import DDOD
@@ -38,7 +38,7 @@ from .solov2 import SOLOv2
 from .sparse_rcnn import SparseRCNN
 from .tood import TOOD
 from .trident_faster_rcnn import TridentFasterRCNN
-from .two_stage import TwoStageDetector
+from .two_stage import TwoStageDetector, TwoStageDetectorWithCount
 from .vfnet import VFNet
 from .yolact import YOLACT
 from .yolo import YOLOV3
@@ -54,5 +54,6 @@ __all__ = [
     'VFNet', 'DETR', 'TridentFasterRCNN', 'SparseRCNN', 'SCNet', 'SOLO',
     'SOLOv2', 'DeformableDETR', 'AutoAssign', 'YOLOF', 'CenterNet', 'YOLOX',
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
-    'MaskFormer', 'DDOD', 'Mask2Former'
+    'MaskFormer', 'DDOD', 'Mask2Former',
+    'TwoStageDetectorWithCount', 'CascadeRCNNWithCount'
 ]

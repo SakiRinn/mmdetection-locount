@@ -11,7 +11,7 @@ train_pipeline = [
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),  # 20220403 add gt_counts
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_counts']),  # 20220403 add gt_counts
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -29,21 +29,21 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=6,  # 原为2，20220328修改（imgs_per_gpu） 
+    samples_per_gpu=6,  # 原为2，20220328修改（imgs_per_gpu）
     workers_per_gpu=2,
     train=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/train.json',
-        img_prefix=data_root + 'train/',
+        ann_file=data_root + 'train.json',
+        img_prefix=data_root + 'Locount_ImagesTrain/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/test.json',
-        img_prefix=data_root + 'test/',
+        ann_file=data_root + 'test.json',
+        img_prefix=data_root + 'Locount_ImagesTest/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/test.json',
-        img_prefix=data_root + 'test/',
+        ann_file=data_root + 'test.json',
+        img_prefix=data_root + 'Locount_ImagesTest/',
         pipeline=test_pipeline))
 evaluation = dict(interval=1, metric='bbox')

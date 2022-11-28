@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .anchor_free_head import AnchorFreeHead
-from .anchor_head import AnchorHead
+from .anchor_head import AnchorHead, AnchorHeadWithCount
 from .atss_head import ATSSHead
 from .autoassign_head import AutoAssignHead
 from .cascade_rpn_head import CascadeRPNHead, StageCascadeRPNHead
@@ -30,7 +30,7 @@ from .pisa_ssd_head import PISASSDHead
 from .reppoints_head import RepPointsHead
 from .retina_head import RetinaHead
 from .retina_sepbn_head import RetinaSepBNHead
-from .rpn_head import RPNHead
+from .rpn_head import RPNHead, RPNHeadWithCount
 from .sabl_retina_head import SABLRetinaHead
 from .solo_head import DecoupledSOLOHead, DecoupledSOLOLightHead, SOLOHead
 from .solov2_head import SOLOV2Head
@@ -54,5 +54,6 @@ __all__ = [
     'DETRHead', 'YOLOFHead', 'DeformableDETRHead', 'SOLOHead',
     'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
-    'Mask2FormerHead', 'SOLOV2Head', 'DDODHead'
+    'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
+    'AnchorHeadWithCount', 'RPNHeadWithCount'
 ]

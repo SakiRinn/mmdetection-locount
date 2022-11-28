@@ -8,7 +8,7 @@ from mmcv.cnn import ConvModule
 from mmcv.ops import batched_nms
 
 from ..builder import HEADS
-from .anchor_head import AnchorHead
+from .anchor_head import AnchorHead, AnchorHeadWithCount
 
 
 @HEADS.register_module()
@@ -263,3 +263,166 @@ class RPNHead(AnchorHead):
                                          score_threshold, nms_pre,
                                          cfg.max_per_img)
         return dets
+
+
+@HEADS.register_module()
+class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
+
+    def __init__(self,
+                 in_channels,
+                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01),
+                 num_convs=1,
+                 **kwargs):
+        self.num_convs = num_convs
+        super(RPNHeadWithCount, self).__init__(
+            1, 1, in_channels, init_cfg=init_cfg, **kwargs)
+
+    def _init_layers(self):
+        if self.num_convs > 1:
+            rpn_convs = []
+            for i in range(self.num_convs):
+                if i == 0:
+                    in_channels = self.in_channels
+                else:
+                    in_channels = self.feat_channels
+                rpn_convs.append(
+                    ConvModule(
+                        in_channels,
+                        self.feat_channels,
+                        3,
+                        padding=1,
+                        inplace=False))
+            self.rpn_conv = nn.Sequential(*rpn_convs)
+        else:
+            self.rpn_conv = nn.Conv2d(
+                self.in_channels, self.feat_channels, 3, padding=1)
+        self.rpn_cls = nn.Conv2d(self.feat_channels,
+                                 self.num_base_priors * self.cls_out_channels,
+                                 1)
+        self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_base_priors * 4,
+                                 1)
+        self.rpn_cnt = nn.Conv2d(self.feat_channels,
+                                 self.num_base_priors * self.cnt_out_channels,
+                                 1)
+
+    def forward_single(self, x):
+        x = self.rpn_conv(x)
+        x = F.relu(x, inplace=False)
+        rpn_cls_score = self.rpn_cls(x)
+        rpn_bbox_pred = self.rpn_reg(x)
+        rpn_cnt_score = self.rpn_cnt(x)
+        return rpn_cls_score, rpn_bbox_pred, rpn_cnt_score
+
+    def loss(self,
+             cls_scores,
+             bbox_preds,
+             cnt_scores,
+             gt_bboxes,
+             img_metas,
+             gt_bboxes_ignore=None):
+        losses = super(RPNHeadWithCount, self).loss(
+            cls_scores,
+            bbox_preds,
+            cnt_scores,
+            gt_bboxes,
+            None,
+            None,
+            img_metas,
+            gt_bboxes_ignore=gt_bboxes_ignore)
+        return dict(
+            loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'], loss_rpn_cnt=losses['loss_cnt'])
+
+    def _get_bboxes_single(self,
+                           cls_score_list,
+                           bbox_pred_list,
+                           cnt_score_list,
+                           score_factor_list,
+                           cnt_score_factor_list,
+                           mlvl_anchors,
+                           img_meta,
+                           cfg,
+                           rescale=False,
+                           with_nms=True,
+                           **kwargs):
+        cfg = self.test_cfg if cfg is None else cfg
+        cfg = copy.deepcopy(cfg)
+        img_shape = img_meta['img_shape']
+
+        level_ids = []
+        mlvl_scores = []
+        mlvl_bbox_preds = []
+        mlvl_cnt_scores = []
+        mlvl_valid_anchors = []
+        nms_pre = cfg.get('nms_pre', -1)
+        for level_idx in range(len(cls_score_list)):
+            rpn_cls_score = cls_score_list[level_idx]
+            rpn_bbox_pred = bbox_pred_list[level_idx]
+            rpn_cnt_score = cnt_score_list[level_idx]
+            assert (rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:])
+            # bbox
+            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
+            # cls
+            rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
+            if self.use_sigmoid_cls:
+                rpn_cls_score = rpn_cls_score.reshape(-1)
+                scores = rpn_cls_score.sigmoid()
+            else:
+                rpn_cls_score = rpn_cls_score.reshape(-1, 2)
+                scores = rpn_cls_score.softmax(dim=1)[:, 0]
+            # rpn
+            rpn_cnt_score = rpn_cnt_score.permute(1, 2, 0)
+            if self.use_sigmoid_cnt:
+                rpn_cnt_score = rpn_cnt_score.reshape(-1)
+                cnt_scores = rpn_cnt_score.sigmoid()
+            else:
+                rpn_cnt_score = rpn_cnt_score.reshape(-1, 2)
+                cnt_scores = rpn_cnt_score.softmax(dim=1)[:, 0]
+
+            anchors = mlvl_anchors[level_idx]
+            if 0 < nms_pre < scores.shape[0]:
+                ranked_scores, rank_inds = scores.sort(descending=True)
+                topk_inds = rank_inds[:nms_pre]
+                scores = ranked_scores[:nms_pre]
+                cnt_scores = cnt_scores[topk_inds]
+                rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
+                anchors = anchors[topk_inds, :]
+
+            mlvl_scores.append(scores)
+            mlvl_bbox_preds.append(rpn_bbox_pred)
+            mlvl_cnt_scores.append(cnt_scores)
+            mlvl_valid_anchors.append(anchors)
+            level_ids.append(
+                scores.new_full((scores.size(0), ),
+                                level_idx,
+                                dtype=torch.long))
+
+        return self._bbox_post_process(mlvl_scores, mlvl_bbox_preds,
+                                       mlvl_valid_anchors, level_ids, cfg, img_shape)
+
+    def _bbox_post_process(self, mlvl_scores, mlvl_bboxes,
+                           mlvl_valid_anchors, level_ids, cfg, img_shape, **kwargs):
+        scores = torch.cat(mlvl_scores)
+        # cnt_scores = torch.cat(mlvl_cnt_scores)
+        anchors = torch.cat(mlvl_valid_anchors)
+        rpn_bbox_pred = torch.cat(mlvl_bboxes)
+        proposals = self.bbox_coder.decode(
+            anchors, rpn_bbox_pred, max_shape=img_shape)
+        ids = torch.cat(level_ids)
+
+        if cfg.min_bbox_size >= 0:
+            w = proposals[:, 2] - proposals[:, 0]
+            h = proposals[:, 3] - proposals[:, 1]
+            valid_mask = (w > cfg.min_bbox_size) & (h > cfg.min_bbox_size)
+            if not valid_mask.all():
+                proposals = proposals[valid_mask]
+                scores = scores[valid_mask]
+                # cnt_scores = cnt_scores[valid_mask]
+                ids = ids[valid_mask]
+
+        if proposals.numel() > 0:
+            dets, _ = batched_nms(proposals, scores, ids, cfg.nms)
+            # cnt_dets, _ = batched_nms(proposals, cnt_scores, ids, cfg.nms)
+        else:
+            return proposals.new_zeros(0, 5)
+
+        return dets[:cfg.max_per_img]

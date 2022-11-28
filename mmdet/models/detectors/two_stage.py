@@ -209,3 +209,64 @@ class TwoStageDetector(BaseDetector):
                 f'list of supported models,'
                 f'https://mmdetection.readthedocs.io/en/latest/tutorials/pytorch2onnx.html#list-of-supported-models-exportable-to-onnx'  # noqa E501
             )
+
+
+@DETECTORS.register_module()
+class TwoStageDetectorWithCount(TwoStageDetector):
+
+    def __init__(self,
+                 backbone,
+                 neck=None,
+                 rpn_head=None,
+                 roi_head=None,
+                 train_cfg=None,
+                 test_cfg=None,
+                 pretrained=None,
+                 init_cfg=None):
+        super(TwoStageDetectorWithCount, self).__init__(
+            backbone,
+            neck,
+            rpn_head,
+            roi_head,
+            train_cfg,
+            test_cfg,
+            pretrained,
+            init_cfg)
+
+    def forward_train(self,
+                      img,
+                      img_metas,
+                      gt_bboxes,
+                      gt_labels,
+                      gt_counts,
+                      gt_bboxes_ignore=None,
+                      gt_masks=None,
+                      proposals=None,
+                      **kwargs):
+        x = self.extract_feat(img)
+
+        losses = dict()
+
+        if self.with_rpn:
+            proposal_cfg = self.train_cfg.get('rpn_proposal',
+                                              self.test_cfg.rpn)
+            rpn_losses, proposal_list = self.rpn_head.forward_train(
+                x,
+                img_metas,
+                gt_bboxes,
+                gt_labels=None,
+                gt_counts=None,
+                gt_bboxes_ignore=gt_bboxes_ignore,
+                proposal_cfg=proposal_cfg,
+                **kwargs)
+            losses.update(rpn_losses)
+        else:
+            proposal_list = proposals
+
+        roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
+                                                 gt_bboxes, gt_labels, gt_counts,
+                                                 gt_bboxes_ignore, gt_masks,
+                                                 **kwargs)
+        losses.update(roi_losses)
+
+        return losses

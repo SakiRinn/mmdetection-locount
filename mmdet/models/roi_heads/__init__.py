@@ -2,8 +2,9 @@
 from .base_roi_head import BaseRoIHead
 from .bbox_heads import (BBoxHead, ConvFCBBoxHead, DIIHead,
                          DoubleConvFCBBoxHead, SABLHead, SCNetBBoxHead,
-                         Shared2FCBBoxHead, Shared4Conv1FCBBoxHead)
-from .cascade_roi_head import CascadeRoIHead
+                         Shared2FCBBoxHead, Shared4Conv1FCBBoxHead,
+                         BBoxHeadWithCount, FCBBoxHeadWithCount)
+from .cascade_roi_head import CascadeRoIHead, CascadeRoIHeadWithCount
 from .double_roi_head import DoubleHeadRoIHead
 from .dynamic_roi_head import DynamicRoIHead
 from .grid_roi_head import GridRoIHead
@@ -33,5 +34,6 @@ __all__ = [
     'SingleRoIExtractor', 'PISARoIHead', 'PointRendRoIHead', 'MaskPointHead',
     'CoarseMaskHead', 'DynamicRoIHead', 'SparseRoIHead', 'TridentRoIHead',
     'SCNetRoIHead', 'SCNetMaskHead', 'SCNetSemanticHead', 'SCNetBBoxHead',
-    'FeatureRelayHead', 'GlobalContextHead'
+    'FeatureRelayHead', 'GlobalContextHead',
+    'CascadeRoIHeadWithCount', 'BBoxHeadWithCount', 'FCBBoxHeadWithCount'
 ]

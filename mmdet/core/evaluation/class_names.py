@@ -70,9 +70,9 @@ def coco_classes():
                "Baby diapers",
                "Baby Furniture",
                "Baby washing and nursing supplie",
-               "Baby slippers",          
+               "Baby slippers",
                "Baby handkerchiefs ",
-               "Baby crib",         
+               "Baby crib",
                "Baby carriage",
                "Baby tableware",
                "Dairy",
@@ -145,7 +145,7 @@ def coco_classes():
                "Bath lotion",
                "Soap",                 # DeleteClass 20191102
                # "Flower dew",           # DeleteClass 20191102  10       20200114Del
-               "Emulsion",             
+               "Emulsion",
                "Facial Cleanser",
                "Razor",
                "Facial mask",
@@ -171,7 +171,7 @@ def coco_classes():
                "Washing machine",
                "Microwave Oven",
                "Desk lamp",
-               "Air conditioning fan",    
+               "Air conditioning fan",
                "Air conditioner",
                "Soybean Milk machine",
                "Electric iron",
@@ -184,7 +184,7 @@ def coco_classes():
                "Electromagnetic furnace",
                "Electric frying pan",
                "Electric steaming pan",             # DeleteClass 20191103
-               "Hair drier",                
+               "Hair drier",
                "Socket",
                "Refrigerator",
                "Coat hanger",
