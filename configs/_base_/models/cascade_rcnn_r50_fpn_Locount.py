@@ -48,7 +48,7 @@ model = dict(
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=140,  # 原80
-                #num_counts=57, 
+                #num_counts=57,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -58,15 +58,17 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
-                               loss_weight=1.0)),
+                loss_bbox=dict(
+                    type='SmoothL1Loss',
+                    beta=1.0,
+                    loss_weight=1.0)),
             dict(
                 type='Shared2FCBBoxHead',
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=140,  # 原80
-                #num_counts=57, 
+                #num_counts=57,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -76,7 +78,8 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0,
+                loss_bbox=dict(type='SmoothL1Loss',
+                               beta=1.0,
                                loss_weight=1.0)),
             dict(
                 type='Shared2FCBBoxHead',
@@ -84,7 +87,7 @@ model = dict(
                 fc_out_channels=1024,
                 roi_feat_size=7,
                 num_classes=140,  # 原80
-                #num_counts=57, 
+                #num_counts=57,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
@@ -94,7 +97,10 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0))
+                loss_bbox=dict(
+                    type='SmoothL1Loss',
+                    beta=1.0,
+                    loss_weight=1.0))
         ]),
     # model training and testing settings
     train_cfg=dict(

@@ -92,6 +92,7 @@ class TwoStageDetector(BaseDetector):
                       img_metas,
                       gt_bboxes,
                       gt_labels,
+                      gt_counts,    # NOTE: add counts
                       gt_bboxes_ignore=None,
                       gt_masks=None,
                       proposals=None,

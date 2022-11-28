@@ -26,9 +26,9 @@ class CocoDataset(CustomDataset):
     CLASSES = ("Baby diapers",
                "Baby Furniture",
                "Baby washing and nursing supplie",
-               "Baby slippers",          
+               "Baby slippers",
                "Baby handkerchiefs ",
-               "Baby crib",         
+               "Baby crib",
                "Baby carriage",
                "Baby tableware",
                "Dairy",
@@ -101,7 +101,7 @@ class CocoDataset(CustomDataset):
                "Bath lotion",
                "Soap",                 # DeleteClass 20191102
                # "Flower dew",           # DeleteClass 20191102  10       20200114Del
-               "Emulsion",             
+               "Emulsion",
                "Facial Cleanser",
                "Razor",
                "Facial mask",
@@ -127,7 +127,7 @@ class CocoDataset(CustomDataset):
                "Washing machine",
                "Microwave Oven",
                "Desk lamp",
-               "Air conditioning fan",    
+               "Air conditioning fan",
                "Air conditioner",
                "Soybean Milk machine",
                "Electric iron",
@@ -140,7 +140,7 @@ class CocoDataset(CustomDataset):
                "Electromagnetic furnace",
                "Electric frying pan",
                "Electric steaming pan",             # DeleteClass 20191103
-               "Hair drier",                
+               "Hair drier",
                "Socket",
                "Refrigerator",
                "Coat hanger",
@@ -318,7 +318,8 @@ class CocoDataset(CustomDataset):
             inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
             if inter_w * inter_h == 0:
                 continue
-            if ann['area'] <= 0 or w < 1 or h < 1:
+            # if ann['area'] <= 0 or w < 1 or h < 1:
+            if w < 1 or h < 1:
                 continue
             if ann['category_id'] not in self.cat_ids:
                 continue
