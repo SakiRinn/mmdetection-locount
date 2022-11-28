@@ -379,7 +379,7 @@ class LoadAnnotations:
         results['seg_fields'].append('gt_semantic_seg')
         return results
 
-    def _load_count(self, results):
+    def _load_counts(self, results):
         # NOTE: 20221129 - Implement this function
         results['gt_counts'] = results['ann_info']['counts'].copy()
         return results
@@ -406,7 +406,7 @@ class LoadAnnotations:
         if self.with_seg:
             results = self._load_semantic_seg(results)
         if self.with_count:     # NOTE: Use the new function
-            results = self._load_count(results)
+            results = self._load_counts(results)
         return results
 
     def __repr__(self):

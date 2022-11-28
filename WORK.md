@@ -3,12 +3,22 @@
 * `tools/misc/locount_txt2json.py`\
   将原为`.txt`格式的annotations转化为单个`.json`文件。
 * `mmdet/datasets/pipelines/loading.py`\
+  主要修改`LoadAnnotations`类。
   添加`with_count`参数，并实现了`_load_count`函数。
 * `mmdet/datasets/coco.py`\
   检测条件修改，删除了`area`键的检测。
   ```Python
   # if ann['area'] <= 0 or w < 1 or h < 1:
   if w < 1 or h < 1:
+  ```
+* `mmdet/datasets/pipelines/formatting.py`\
+  将`gt_counts`加入至使用`DataContainer`嵌套的标签。
+  ```Python
+  # for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels']:
+  for key in ['proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels', 'gt_counts']:
+      if key not in results:
+          continue
+      results[key] = DC(to_tensor(results[key]))
   ```
 ## 模型
 * `mmdet/models/detectors/two_stage.py`\
