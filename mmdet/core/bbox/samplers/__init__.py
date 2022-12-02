@@ -7,12 +7,12 @@ from .mask_pseudo_sampler import MaskPseudoSampler
 from .mask_sampling_result import MaskSamplingResult
 from .ohem_sampler import OHEMSampler
 from .pseudo_sampler import PseudoSampler
-from .random_sampler import RandomSampler
+from .random_sampler import RandomSampler, RandomSamplerWithCount
 from .sampling_result import SamplingResult
 from .score_hlr_sampler import ScoreHLRSampler
 
 __all__ = [
-    'BaseSampler', 'PseudoSampler', 'RandomSampler',
+    'BaseSampler', 'PseudoSampler', 'RandomSampler', 'RandomSamplerWithCount',
     'InstanceBalancedPosSampler', 'IoUBalancedNegSampler', 'CombinedSampler',
     'OHEMSampler', 'SamplingResult', 'ScoreHLRSampler', 'MaskPseudoSampler',
     'MaskSamplingResult'

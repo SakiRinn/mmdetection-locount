@@ -629,3 +629,189 @@ class CascadeRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
                                                 det_bboxes.shape[1],
                                                 max_shape[0], max_shape[1])
             return det_bboxes, det_labels, segm_results
+
+
+@HEADS.register_module()
+class CascadeRoIHeadWithCount(CascadeRoIHead):
+
+    def __init__(self,
+                 num_stages,
+                 stage_loss_weights,
+                 bbox_roi_extractor=None,
+                 bbox_head=None,
+                 mask_roi_extractor=None,
+                 mask_head=None,
+                 shared_head=None,
+                 train_cfg=None,
+                 test_cfg=None,
+                 pretrained=None,
+                 init_cfg=None):
+        assert bbox_roi_extractor is not None
+        assert bbox_head is not None
+        assert shared_head is None, \
+            'Shared head is not supported in Cascade RCNN anymore'
+
+        self.num_stages = num_stages
+        self.stage_loss_weights = stage_loss_weights
+        super(CascadeRoIHead, self).__init__(
+            bbox_roi_extractor=bbox_roi_extractor,
+            bbox_head=bbox_head,
+            mask_roi_extractor=mask_roi_extractor,
+            mask_head=mask_head,
+            shared_head=shared_head,
+            train_cfg=train_cfg,
+            test_cfg=test_cfg,
+            pretrained=pretrained,
+            init_cfg=init_cfg)
+
+    def init_bbox_head(self, bbox_roi_extractor, bbox_head):
+        """Initialize box head and box roi extractor.
+
+        Args:
+            bbox_roi_extractor (dict): Config of box roi extractor.
+            bbox_head (dict): Config of box in box head.
+        """
+        self.bbox_roi_extractor = ModuleList()
+        self.bbox_head = ModuleList()
+        if not isinstance(bbox_roi_extractor, list):
+            bbox_roi_extractor = [
+                bbox_roi_extractor for _ in range(self.num_stages)
+            ]
+        if not isinstance(bbox_head, list):
+            bbox_head = [bbox_head for _ in range(self.num_stages)]
+        assert len(bbox_roi_extractor) == len(bbox_head) == self.num_stages
+        for roi_extractor, head in zip(bbox_roi_extractor, bbox_head):
+            self.bbox_roi_extractor.append(build_roi_extractor(roi_extractor))
+            self.bbox_head.append(build_head(head))
+
+    def _bbox_forward(self, stage, x, rois):
+        """Box head forward function used in both training and testing."""
+        bbox_roi_extractor = self.bbox_roi_extractor[stage]
+        bbox_head = self.bbox_head[stage]
+        bbox_feats = bbox_roi_extractor(x[:bbox_roi_extractor.num_inputs],
+                                        rois)
+        # do not support caffe_c4 model anymore
+        cls_score, bbox_pred, cnt_infer = bbox_head(bbox_feats)
+
+        bbox_results = dict(
+            cls_score=cls_score, bbox_pred=bbox_pred, bbox_feats=bbox_feats, cnt_infer=cnt_infer)
+        return bbox_results
+
+    def _bbox_forward_train(self, stage, x, sampling_results,
+                            gt_bboxes, gt_labels, gt_counts, rcnn_train_cfg):
+        """Run forward function and calculate loss for box head in training."""
+        rois = bbox2roi([res.bboxes for res in sampling_results])
+        bbox_results = self._bbox_forward(stage, x, rois)
+        bbox_targets = self.bbox_head[stage].get_targets(sampling_results,
+                                                         gt_bboxes,
+                                                         gt_labels,
+                                                         gt_counts,
+                                                         rcnn_train_cfg)
+        loss_bbox = self.bbox_head[stage].loss(bbox_results['cls_score'],
+                                               bbox_results['bbox_pred'],
+                                               bbox_results['cnt_infer'],
+                                               rois,
+                                               *bbox_targets)
+
+        bbox_results.update(
+            loss_bbox=loss_bbox, rois=rois, bbox_targets=bbox_targets)
+        return bbox_results
+
+    def forward_train(self,
+                      x,
+                      img_metas,
+                      proposal_list,
+                      gt_bboxes,
+                      gt_labels,
+                      gt_counts,
+                      gt_bboxes_ignore=None,
+                      gt_masks=None):
+        """
+        Args:
+            x (list[Tensor]): list of multi-level img features.
+            img_metas (list[dict]): list of image info dict where each dict
+                has: 'img_shape', 'scale_factor', 'flip', and may also contain
+                'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
+                For details on the values of these keys see
+                `mmdet/datasets/pipelines/formatting.py:Collect`.
+            proposals (list[Tensors]): list of region proposals.
+            gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
+                shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
+            gt_labels (list[Tensor]): class indices corresponding to each box
+            gt_bboxes_ignore (None | list[Tensor]): specify which bounding
+                boxes can be ignored when computing the loss.
+            gt_masks (None | Tensor) : true segmentation masks for each box
+                used if the architecture supports a segmentation task.
+
+        Returns:
+            dict[str, Tensor]: a dictionary of loss components
+        """
+        losses = dict()
+        for i in range(self.num_stages):
+            self.current_stage = i
+            rcnn_train_cfg = self.train_cfg[i]
+            lw = self.stage_loss_weights[i]
+
+            # assign gts and sample proposals
+            sampling_results = []
+            if self.with_bbox or self.with_mask:
+                bbox_assigner = self.bbox_assigner[i]
+                bbox_sampler = self.bbox_sampler[i]
+                num_imgs = len(img_metas)
+                if gt_bboxes_ignore is None:
+                    gt_bboxes_ignore = [None for _ in range(num_imgs)]
+
+                for j in range(num_imgs):
+                    assign_result = bbox_assigner.assign(
+                        proposal_list[j], gt_bboxes[j], gt_bboxes_ignore[j],
+                        gt_labels[j])
+                    sampling_result = bbox_sampler.sample(
+                        assign_result,
+                        proposal_list[j],
+                        gt_bboxes[j],
+                        gt_labels[j],
+                        gt_counts[j],
+                        feats=[lvl_feat[j][None] for lvl_feat in x])
+                    sampling_results.append(sampling_result)
+
+            # bbox head forward and loss
+            bbox_results = self._bbox_forward_train(i, x, sampling_results,
+                                                    gt_bboxes, gt_labels, gt_counts,
+                                                    rcnn_train_cfg)
+
+            for name, value in bbox_results['loss_bbox'].items():
+                losses[f's{i}.{name}'] = (
+                    value * lw if 'loss' in name else value)
+
+            # mask head forward and loss
+            if self.with_mask:
+                mask_results = self._mask_forward_train(
+                    i, x, sampling_results, gt_masks, rcnn_train_cfg,
+                    bbox_results['bbox_feats'])
+                for name, value in mask_results['loss_mask'].items():
+                    losses[f's{i}.{name}'] = (
+                        value * lw if 'loss' in name else value)
+
+            # refine bboxes
+            if i < self.num_stages - 1:
+                pos_is_gts = [res.pos_is_gt for res in sampling_results]
+                # bbox_targets is a tuple
+                roi_labels = bbox_results['bbox_targets'][0]
+                with torch.no_grad():
+                    cls_score = bbox_results['cls_score']
+                    if self.bbox_head[i].custom_activation:
+                        cls_score = self.bbox_head[i].loss_cls.get_activation(
+                            cls_score)
+
+                    # Empty proposal.
+                    if cls_score.numel() == 0:
+                        break
+
+                    roi_labels = torch.where(
+                        roi_labels == self.bbox_head[i].num_classes,
+                        cls_score[:, :-1].argmax(1), roi_labels)
+                    proposal_list = self.bbox_head[i].refine_bboxes(
+                        bbox_results['rois'], roi_labels,
+                        bbox_results['bbox_pred'], pos_is_gts, img_metas)
+
+        return losses

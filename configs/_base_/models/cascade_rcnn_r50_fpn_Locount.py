@@ -33,7 +33,7 @@ model = dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
     roi_head=dict(
-        type='CascadeRoIHead',
+        type='CascadeRoIHeadWithCount',
         num_stages=3,
         stage_loss_weights=[1, 0.5, 0.25],
         bbox_roi_extractor=dict(
@@ -43,7 +43,7 @@ model = dict(
             featmap_strides=[4, 8, 16, 32]),
         bbox_head=[
             dict(
-                type='Shared2FCBBoxHead',
+                type='FCBBoxHeadWithCount',
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -58,12 +58,14 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(
-                    type='SmoothL1Loss',
-                    beta=1.0,
-                    loss_weight=1.0)),
+                loss_bbox=dict(type='SmoothL1Loss',
+                               beta=1.0,
+                               loss_weight=1.0),
+                loss_cnt=dict(type='SmoothL1Loss',
+                              beta=1.0,
+                              loss_weight=1.0)),
             dict(
-                type='Shared2FCBBoxHead',
+                type='FCBBoxHeadWithCount',
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -80,9 +82,12 @@ model = dict(
                     loss_weight=1.0),
                 loss_bbox=dict(type='SmoothL1Loss',
                                beta=1.0,
-                               loss_weight=1.0)),
+                               loss_weight=1.0),
+                loss_cnt=dict(type='SmoothL1Loss',
+                              beta=1.0,
+                              loss_weight=1.0)),
             dict(
-                type='Shared2FCBBoxHead',
+                type='FCBBoxHeadWithCount',
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -97,10 +102,12 @@ model = dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
                     loss_weight=1.0),
-                loss_bbox=dict(
-                    type='SmoothL1Loss',
-                    beta=1.0,
-                    loss_weight=1.0))
+                loss_bbox=dict(type='SmoothL1Loss',
+                               beta=1.0,
+                               loss_weight=1.0),
+                loss_cnt=dict(type='SmoothL1Loss',
+                              beta=1.0,
+                              loss_weight=1.0))
         ]),
     # model training and testing settings
     train_cfg=dict(
@@ -139,7 +146,7 @@ model = dict(
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
-                    type='RandomSampler',
+                    type='RandomSamplerWithCount',
                     num=512,
                     pos_fraction=0.25,
                     neg_pos_ub=-1,
@@ -155,7 +162,7 @@ model = dict(
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
-                    type='RandomSampler',
+                    type='RandomSamplerWithCount',
                     num=512,
                     pos_fraction=0.25,
                     neg_pos_ub=-1,
@@ -171,7 +178,7 @@ model = dict(
                     match_low_quality=False,
                     ignore_iof_thr=-1),
                 sampler=dict(
-                    type='RandomSampler',
+                    type='RandomSamplerWithCount',
                     num=512,
                     pos_fraction=0.25,
                     neg_pos_ub=-1,

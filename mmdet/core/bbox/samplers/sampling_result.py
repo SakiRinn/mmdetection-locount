@@ -151,3 +151,27 @@ class SamplingResult(util_mixins.NiceRepr):
             rng=rng)
         self = sampler.sample(assign_result, bboxes, gt_bboxes, gt_labels)
         return self
+
+
+class SamplingResultWithCount(SamplingResult):
+
+    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
+                 gt_flags, gt_counts):
+        super(SamplingResultWithCount, self).__init__(pos_inds, neg_inds,
+                                                      bboxes, gt_bboxes, assign_result, gt_flags)
+        self.pos_gt_counts = gt_counts[pos_inds]
+        self.neg_gt_counts = gt_counts[neg_inds]
+
+    @property
+    def info(self):
+        return {
+            'pos_inds': self.pos_inds,
+            'neg_inds': self.neg_inds,
+            'pos_bboxes': self.pos_bboxes,
+            'neg_bboxes': self.neg_bboxes,
+            'pos_is_gt': self.pos_is_gt,
+            'num_gts': self.num_gts,
+            'pos_assigned_gt_inds': self.pos_assigned_gt_inds,
+            'pos_gt_counts': self.pos_gt_counts,
+            'neg_gt_counts': self.neg_gt_counts,
+        }
