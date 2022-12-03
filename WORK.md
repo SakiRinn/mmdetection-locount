@@ -22,8 +22,9 @@
   ```
 
 ## 模型
-* `mmdet/models/detectors/two_stage.py`\
-  在`forward_train`函数下添加`gt_counts`参数。
+* `mmdet/models/detectors/cascade_rcnn.py`\
+  添加`CascadeRCNNWithCount`类。
+  具体改动为在`forward_train`函数下添加`gt_counts`参数。
   ```Python
   # roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
   #                                          gt_bboxes, gt_labels,
@@ -46,7 +47,10 @@
   添加`RandomSamplerWithCount`类。
 * `mmdet/core/bbox/samplers/sampling_result.py`\
   添加`SamplingResultWithCount`类。
-
+* `mmdet/core/bbox/assigners/max_iou_assigner.py`\
+  添加`MaxIoUAssignerWithCount`类。
+* `mmdet/core/bbox/assigners/assign_result.py`\
+  添加`AssignResultWithCount`类。
 
 ## 配置文件
 * `configs/_base_/datasets/cocoLHC.py`\

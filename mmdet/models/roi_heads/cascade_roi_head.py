@@ -764,7 +764,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                 for j in range(num_imgs):
                     assign_result = bbox_assigner.assign(
                         proposal_list[j], gt_bboxes[j], gt_bboxes_ignore[j],
-                        gt_labels[j])
+                        gt_labels[j], gt_counts[j])
                     sampling_result = bbox_sampler.sample(
                         assign_result,
                         proposal_list[j],

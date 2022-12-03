@@ -1,6 +1,6 @@
 # model settings
 model = dict(
-    type='CascadeRCNN',
+    type='CascadeRCNNWithCount',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -139,7 +139,7 @@ model = dict(
         rcnn=[
             dict(
                 assigner=dict(
-                    type='MaxIoUAssigner',
+                    type='MaxIoUAssignerWithCount',
                     pos_iou_thr=0.5,
                     neg_iou_thr=0.5,
                     min_pos_iou=0.5,
@@ -155,7 +155,7 @@ model = dict(
                 debug=False),
             dict(
                 assigner=dict(
-                    type='MaxIoUAssigner',
+                    type='MaxIoUAssignerWithCount',
                     pos_iou_thr=0.6,
                     neg_iou_thr=0.6,
                     min_pos_iou=0.6,
@@ -171,7 +171,7 @@ model = dict(
                 debug=False),
             dict(
                 assigner=dict(
-                    type='MaxIoUAssigner',
+                    type='MaxIoUAssignerWithCount',
                     pos_iou_thr=0.7,
                     neg_iou_thr=0.7,
                     min_pos_iou=0.7,
