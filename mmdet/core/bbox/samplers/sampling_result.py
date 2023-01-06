@@ -157,10 +157,21 @@ class SamplingResultWithCount(SamplingResult):
 
     def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
                  gt_flags, gt_counts):
-        super(SamplingResultWithCount, self).__init__(pos_inds, neg_inds,
-                                                      bboxes, gt_bboxes, assign_result, gt_flags)
         self.pos_gt_counts = gt_counts[pos_inds]
         self.neg_gt_counts = gt_counts[neg_inds]
+
+        super(SamplingResultWithCount, self).__init__(pos_inds, neg_inds,
+                                                      bboxes, gt_bboxes, assign_result, gt_flags)
+
+        if assign_result.counts is not None:
+            self.pos_gt_counts = assign_result.counts[pos_inds] # 0529 add
+            #print("sampling_result - assign_result.counts is not None, labels:", self.pos_gt_labels)
+        else:
+            self.pos_gt_counts = None # 0529 add
+            #print("sampling_result - assign_result.counts is None, labels:", self.pos_gt_labels)
+
+        if assign_result.counts is None and assign_result.labels is not None:
+            print("sampling_result - assign_result.counts is None, labels:", self.pos_gt_labels)
 
     @property
     def info(self):

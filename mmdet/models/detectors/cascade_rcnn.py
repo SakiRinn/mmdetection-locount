@@ -61,7 +61,7 @@ class CascadeRCNNWithCount(CascadeRCNN):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
-        super(CascadeRCNN, self).__init__(
+        super(CascadeRCNNWithCount, self).__init__(
             backbone=backbone,
             neck=neck,
             rpn_head=rpn_head,

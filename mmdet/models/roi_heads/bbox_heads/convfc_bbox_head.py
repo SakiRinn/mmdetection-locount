@@ -250,8 +250,8 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
                  num_cls_fcs=1,
                  num_reg_convs=0,
                  num_reg_fcs=1,
-                 num_cnt_convs=0,
-                 num_cnt_fcs=1,
+                 num_cnt_convs=0,           # ADD
+                 num_cnt_fcs=1,             # ADD
                  conv_out_channels=256,
                  fc_out_channels=1024,
                  conv_cfg=None,
@@ -260,9 +260,13 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
                  *args,
                  **kwargs):
         self.with_cnt = True
+        self.num_counts = 57
         self.cnt_predictor_cfg = dict(type='Linear')
         loss_cnt = dict(type='SmoothL1Loss', beta=1.0, loss_weight=1.0)
 
+        if 'num_counts' in kwargs and isinstance(kwargs['num_counts'], int):
+            self.num_counts = kwargs['num_counts']
+            del kwargs['num_counts']
         if 'with_cnt' in kwargs and isinstance(kwargs['with_cnt'], bool):
             self.with_cnt = kwargs['with_cnt']
             del kwargs['with_cnt']
@@ -273,85 +277,43 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
             loss_cnt = kwargs['loss_cnt']
             del kwargs['loss_cnt']
 
-        super(ConvFCBBoxHead, self).__init__(
-            *args, init_cfg=init_cfg, **kwargs)
-        assert (num_shared_convs + num_shared_fcs + num_cls_convs +
-                num_cls_fcs + num_reg_convs + num_reg_fcs > 0)
-        if num_cls_convs > 0 or num_reg_convs > 0:
-            assert num_shared_fcs == 0
-        if not self.with_cls:
-            assert num_cls_convs == 0 and num_cls_fcs == 0
-        if not self.with_reg:
-            assert num_reg_convs == 0 and num_reg_fcs == 0
-        self.num_shared_convs = num_shared_convs
-        self.num_shared_fcs = num_shared_fcs
-        self.num_cls_convs = num_cls_convs
-        self.num_cls_fcs = num_cls_fcs
-        self.num_reg_convs = num_reg_convs
-        self.num_reg_fcs = num_reg_fcs
+        super(FCBBoxHeadWithCount, self).__init__(
+            num_shared_convs,
+            num_shared_fcs,
+            num_cls_convs,
+            num_cls_fcs,
+            num_reg_convs,
+            num_reg_fcs,
+            conv_out_channels,
+            fc_out_channels,
+            conv_cfg,
+            norm_cfg,
+            init_cfg,
+            *args,
+            **kwargs)
+
+        if not self.with_cnt:
+            assert num_cnt_convs == 0 and num_cnt_fcs == 0
         self.num_cnt_convs = num_cnt_convs
         self.num_cnt_fcs = num_cnt_fcs
-        self.conv_out_channels = conv_out_channels
-        self.fc_out_channels = fc_out_channels
-        self.conv_cfg = conv_cfg
-        self.norm_cfg = norm_cfg
+        self.loss_cnt = build_loss(loss_cnt)
 
-        # add shared convs and fcs
-        self.shared_convs, self.shared_fcs, last_layer_dim = \
-            self._add_conv_fc_branch(
-                self.num_shared_convs, self.num_shared_fcs, self.in_channels,
-                True)
-        self.shared_out_channels = last_layer_dim
-
-        # add cls specific branch
-        self.cls_convs, self.cls_fcs, self.cls_last_dim = \
-            self._add_conv_fc_branch(
-                self.num_cls_convs, self.num_cls_fcs, self.shared_out_channels)
-
-        # add reg specific branch
-        self.reg_convs, self.reg_fcs, self.reg_last_dim = \
-            self._add_conv_fc_branch(
-                self.num_reg_convs, self.num_reg_fcs, self.shared_out_channels)
-
-        # add cnt specific branch
+        # ADD cnt specific branch
         self.cnt_convs, self.cnt_fcs, self.cnt_last_dim = \
             self._add_conv_fc_branch(
                 self.num_cnt_convs, self.num_cnt_fcs, self.shared_out_channels)
 
         if self.num_shared_fcs == 0 and not self.with_avg_pool:
-            if self.num_cls_fcs == 0:
-                self.cls_last_dim *= self.roi_feat_area
-            if self.num_reg_fcs == 0:
-                self.reg_last_dim *= self.roi_feat_area
             if self.num_cnt_fcs == 0:
                 self.cnt_last_dim *= self.roi_feat_area
 
-        self.relu = nn.ReLU(inplace=True)
-        # reconstruct fc_cls and fc_reg since input channels are changed
-        if self.with_cls:
-            if self.custom_cls_channels:
-                cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
-            else:
-                cls_channels = self.num_classes + 1
-            self.fc_cls = build_linear_layer(
-                self.cls_predictor_cfg,
-                in_features=self.cls_last_dim,
-                out_features=cls_channels)
-        if self.with_reg:
-            out_dim_reg = (4 if self.reg_class_agnostic else 4 *
-                           self.num_classes)
-            self.fc_reg = build_linear_layer(
-                self.reg_predictor_cfg,
-                in_features=self.reg_last_dim,
-                out_features=out_dim_reg)
-        if self.with_cnt:
+        if self.with_cnt:                       # ADD
             out_dim_cnt = 4                     # Follow the paper
             self.fc_cnt = build_linear_layer(
                 self.cnt_predictor_cfg,
                 in_features=self.cnt_last_dim,
-                out_features=out_dim_cnt)
-
-        self.loss_cnt = build_loss(loss_cnt)
+                # out_features=out_dim_cnt)
+                out_features=self.num_counts)
 
         if init_cfg is None:
             # when init_cfg is None,
@@ -369,7 +331,7 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
                         dict(name='shared_fcs'),
                         dict(name='cls_fcs'),
                         dict(name='reg_fcs'),
-                        dict(name='cnt_fcs')
+                        dict(name='cnt_fcs')        # ADD
                     ])
             ]
 
@@ -421,8 +383,8 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        cnt_infer = self.fc_cnt(x_reg) if self.with_cnt else None
-        return cls_score, bbox_pred, cnt_infer
+        cnt_score = self.fc_cnt(x_reg) if self.with_cnt else None       # ADD
+        return cls_score, bbox_pred, cnt_score
 
     def _get_target_single(self, pos_bboxes, neg_bboxes, pos_gt_bboxes,
                            pos_gt_labels, pos_gt_counts, cfg):
@@ -566,7 +528,7 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
     def loss(self,
              cls_score,
              bbox_pred,
-             cnt_infer,
+             cnt_score,
              rois,
              labels,
              label_weights,
@@ -624,8 +586,8 @@ class FCBBoxHeadWithCount(ConvFCBBoxHead):
                 losses['loss_bbox'] = bbox_pred[pos_inds].sum()
         if bbox_pred is not None:
             pos_inds = (counts >= 0)
-            losses['loss_cnt'] = self.loss_cnt(
-                cnt_infer,
+            losses['loss_cnt'] = self.loss_cnt(             # ADD
+                cnt_score,
                 counts[pos_inds.type(torch.bool)],
                 count_weights[pos_inds.type(torch.bool)],
                 avg_factor=counts.size(0),

@@ -146,7 +146,7 @@ class ToDataContainer:
 
     def __init__(self,
                  fields=(dict(key='img', stack=True), dict(key='gt_bboxes'),
-                         dict(key='gt_labels'))):
+                         dict(key='gt_labels'), dict(key='gt_counts'))):
         self.fields = fields
 
     def __call__(self, results):

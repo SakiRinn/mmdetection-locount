@@ -4,7 +4,7 @@ import torch
 from ..builder import BBOX_ASSIGNERS
 from ..iou_calculators import build_iou_calculator
 from .assign_result import AssignResult, AssignResultWithCount
-from .base_assigner import BaseAssigner
+from .base_assigner import BaseAssigner, BaseAssignerWithCount
 
 
 @BBOX_ASSIGNERS.register_module()
@@ -219,7 +219,7 @@ class MaxIoUAssigner(BaseAssigner):
 
 
 @BBOX_ASSIGNERS.register_module()
-class MaxIoUAssignerWithCount(MaxIoUAssigner):
+class MaxIoUAssignerWithCount(MaxIoUAssigner, BaseAssignerWithCount):
 
     def __init__(self,
                  pos_iou_thr,
@@ -269,7 +269,7 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner):
                 ignore_max_overlaps, _ = ignore_overlaps.max(dim=0)
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
-        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
+        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels, gt_counts)
         if assign_on_cpu:
             assign_result.gt_inds = assign_result.gt_inds.to(device)
             assign_result.max_overlaps = assign_result.max_overlaps.to(device)
@@ -351,6 +351,7 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner):
                     assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
+
         if gt_counts is not None:
             assigned_counts = assigned_gt_inds.new_full((num_bboxes, ), -1)
             pos_inds = torch.nonzero(

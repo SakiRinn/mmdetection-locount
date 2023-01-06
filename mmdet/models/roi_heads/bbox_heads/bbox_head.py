@@ -10,6 +10,8 @@ from mmdet.models.builder import HEADS, build_loss
 from mmdet.models.losses import accuracy
 from mmdet.models.utils import build_linear_layer
 
+import numpy as np
+
 
 @HEADS.register_module()
 class BBoxHead(BaseModule):
@@ -592,3 +594,182 @@ class BBoxHead(BaseModule):
             bboxes -= offsets
             batch_dets = torch.cat([bboxes, scores], dim=2)
             return batch_dets, labels
+
+    def init_weights(self):
+        if self.with_cls:
+            nn.init.normal_(self.fc_cls.weight, 0, 0.01)
+            nn.init.constant_(self.fc_cls.bias, 0)
+        if self.with_reg:
+            nn.init.normal_(self.fc_reg.weight, 0, 0.001)
+            nn.init.constant_(self.fc_reg.bias, 0)
+        if self.with_cnt:
+            nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
+            nn.init.constant_(self.fc_cnt.bias, 0)
+
+    def Stage1Div(self, Counts):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = np.array(torch.tensor(Counts, device='cpu'))
+        # Counts_np = Counts.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        # print(Counts_np.shape, Counts_np[0], Counts_np[0].shape)
+        for idx, count in enumerate(Counts_np):
+            #if count ==0:
+            #    GtCountsDiv_list[idx] = 0
+            if 0<=count<5:
+                GtCountsDiv_list[idx] = 1-1
+            elif 5<=count<11:
+                GtCountsDiv_list[idx] = 2-1
+            elif 11<=count<16:
+                GtCountsDiv_list[idx] = 3-1
+            elif 16<=count<21:
+                GtCountsDiv_list[idx] = 4-1
+            elif 21<=count<26:
+                GtCountsDiv_list[idx] = 5-1
+            elif 26<=count<31:
+                GtCountsDiv_list[idx] = 6-1
+            elif 31<=count<36:
+                GtCountsDiv_list[idx] = 7-1
+            elif 36<=count<41:
+                GtCountsDiv_list[idx] = 8-1
+            elif 41<=count<46:
+                GtCountsDiv_list[idx] = 9-1
+            elif 46<=count<100:
+                GtCountsDiv_list[idx] = 10-1
+
+
+        #GtCountBins_list = []
+        #GtCountOneHot_list = [0,0,0,0]
+        #for Val in GtCountsDiv_list:
+        #    GtCountOneHot_list[Val-1]=1
+        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
+
+        return GtCountsDiv_list #GtCountBins_list
+
+    def Stage2Div(self, Counts):
+        ''' Stage1: Divide the range into 6 parts. '''
+        # Counts_np = np.array(torch.tensor(Counts, device='cpu'))
+        Counts_np = Counts.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        for idx, count in enumerate(Counts_np):
+            #if count ==0:
+            #    GtCountsDiv_list[idx] = 0
+            if 0<=count<= 3:
+                GtCountsDiv_list[idx] = 1-1
+            elif 4<=count<= 7:
+                GtCountsDiv_list[idx] = 2-1
+            elif 8<=count<= 11:
+                GtCountsDiv_list[idx] = 3-1
+            elif 12<=count<= 15:
+                GtCountsDiv_list[idx] = 4-1
+            elif 16<=count<= 19:
+                GtCountsDiv_list[idx] = 5-1
+            elif 20 <=count <=23:
+                GtCountsDiv_list[idx] = 6-1
+            elif 24 <=count <=27:
+                GtCountsDiv_list[idx] = 7-1
+            elif 28 <=count <=31:
+                GtCountsDiv_list[idx] = 8-1
+            elif 32 <=count <= 35:
+                GtCountsDiv_list[idx] = 9-1
+            elif 36 <=count <= 39:
+                GtCountsDiv_list[idx] = 10-1
+            elif 40 <=count <=43:
+                GtCountsDiv_list[idx] = 11-1
+            elif 44 <=count <=47:
+                GtCountsDiv_list[idx] = 12-1
+            elif 48 <=count<= 51:
+                GtCountsDiv_list[idx] = 13-1
+            elif 52 <=count <=55:
+                GtCountsDiv_list[idx] = 14-1
+            elif 56 <=count <=59:
+                GtCountsDiv_list[idx] = 15-1
+            elif 60 <=count <=63:
+                GtCountsDiv_list[idx] = 16-1
+
+        #GtCountBins_list = []
+        #GtCountOneHot_list = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
+        #for Val in GtCountsDiv_list:
+        #    GtCountOneHot_list[Val-1]=1
+        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
+
+        return GtCountsDiv_list  #GtCountBins_list
+
+    def Stage3Div(self, Counts):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = Counts.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        for idx, count in enumerate(Counts_np):
+            if count ==0:
+                GtCountsDiv_list[idx] = 0
+            else:
+                GtCountsDiv_list[idx] -= 1
+        #GtCountBins_list = []
+        #GtCountOneHot_list = [0 for i in range(64)]
+        #for Val in GtCountsDiv_list:
+        #    GtCountOneHot_list[Val-1]=1
+        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
+
+        return GtCountsDiv_list  #GtCountBins_list
+
+    def MatchCountWeights(self, CountWeights):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = np.array(torch.tensor(CountWeights, device='cpu'))
+        # Counts_np = CountWeights.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        GtCountBins_list = []
+        for Val in GtCountsDiv_list:
+            #GtCountBins_list.append([Val,Val,Val,Val,Val,Val])
+            #GtCountBins_list.append([32*Val,16*Val,8*Val,4*Val,2*Val,1*Val])
+            GtCountBins_list.append([11*Val,9*Val,7*Val,5*Val,3*Val,1*Val])
+            #GtCountBins_list.append([14.0,12.0,10.0,8.0,6.0,4.0,2.0,1.0])
+        return GtCountBins_list
+
+    def MatchCountWeights_Stage1(self, CountWeights):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = np.array(torch.tensor(CountWeights, device='cpu'))
+        # Counts_np = CountWeights.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        GtCountBins_list = []
+        for Val in GtCountsDiv_list:
+            GtCountBins_list.append([32*Val,16*Val,0*Val,0*Val,0*Val,0*Val])
+        return GtCountBins_list
+    def MatchCountWeights_Stage2(self, CountWeights):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = np.array(torch.tensor(CountWeights, device='cpu'))
+        # Counts_np = CountWeights.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        GtCountBins_list = []
+        for Val in GtCountsDiv_list:
+            GtCountBins_list.append([32*Val,16*Val,8*Val,4*Val,0*Val,0*Val])
+        return GtCountBins_list
+    def MatchCountWeights_Stage3(self, CountWeights):
+        ''' Stage1: Divide the range into 8 parts. '''
+        Counts_np = np.array(torch.tensor(CountWeights, device='cpu'))
+        # Counts_np = CountWeights.cpu().numpy()
+        GtCountsDiv_list = Counts_np.copy()
+        GtCountBins_list = []
+        for Val in GtCountsDiv_list:
+            GtCountBins_list.append([32*Val,16*Val,8*Val,4*Val,2*Val,1*Val])
+        return GtCountBins_list
+
+
+    def int2bin(self, Val):
+        bin_list = [0,0,0,0,0,1]
+        Valb = bin(Val)
+        Valb = Valb[2:].zfill(6)  #填充0，最长8位，
+        bin_list2 = [int(e) for e in Valb]
+        if len(bin_list2) == 6:
+            return bin_list2
+        return bin_list
+
+
+    def bin2int(self, bin_list):
+        if len(bin_list) != 6:
+            return 1
+        Valb=''
+        for e in bin_list:
+            if e < 0.5:
+                Valb += '0'
+            else:
+                Valb += '1'
+        return int(Valb,2)
