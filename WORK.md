@@ -28,11 +28,12 @@
 ## 模型
 该部分修改主要在`mmdet/models/`下进行。
 * `mmdet/models/detectors/two_stage.py`\
-  **基类**。在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
+  **基类**。添加`TwoStageDetectorWithCount`类。\
+  具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，具体同上。
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
-  **基类**。大幅修改`bbox_head`类。
+  **基类**。添加`BBoxHeadWithCount`类。大幅修改原类。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
   添加`FCBBoxHeadWithCount`类，具体添加了一个cnt头。
 * `mmdet/models/roi_heads/cascade_roi_head.py`\
@@ -61,11 +62,11 @@
 
 ## 配置文件
 该部分修改主要在`configs/`下进行。
-* `configs/_base_/datasets/cocoLHC.py`\
+* `configs/_base_/datasets/coco_LHC.py`\
   **新文件**。用于处理Locount数据集。
-* `configs/_base_/models/cascade_rcnn_r50_fpn_Locount.py`\
+* `configs/_base_/models/cascade_rcnn_r50_fpn_locount.py`\
   **新文件**。用于初始化Locount网络结构。
-* `configs/locount/cascade_rcnn_r50_fpn_1x_Locount.py`\
+* `configs/locount/cascade_rcnn_r50_fpn_1x_locount.py`\
   **新文件**。用于整合。
 
 # 启动
@@ -83,7 +84,7 @@ if __name__ == '__main__':
 ## 训练
 运行`tools/train.py`脚本，指定一个config文件。
 ```sh
-python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_Locount.py
+python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py
 ```
 
 ## 现有问题

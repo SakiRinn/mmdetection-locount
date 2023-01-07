@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from ..builder import DETECTORS
-from .two_stage import TwoStageDetector
+from .two_stage import TwoStageDetector, TwoStageDetectorWithCount
 
 
 @DETECTORS.register_module()
@@ -50,7 +50,7 @@ class CascadeRCNN(TwoStageDetector):
 
 
 @DETECTORS.register_module()
-class CascadeRCNNWithCount(CascadeRCNN):
+class CascadeRCNNWithCount(TwoStageDetectorWithCount):
 
     def __init__(self,
                  backbone,
@@ -61,7 +61,7 @@ class CascadeRCNNWithCount(CascadeRCNN):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
-        super(CascadeRCNNWithCount, self).__init__(
+        super(TwoStageDetectorWithCount, self).__init__(
             backbone=backbone,
             neck=neck,
             rpn_head=rpn_head,
@@ -71,40 +71,23 @@ class CascadeRCNNWithCount(CascadeRCNN):
             pretrained=pretrained,
             init_cfg=init_cfg)
 
-    def forward_train(self,
-                      img,
-                      img_metas,
-                      gt_bboxes,
-                      gt_labels,
-                      gt_counts,
-                      gt_bboxes_ignore=None,
-                      gt_masks=None,
-                      proposals=None,
-                      **kwargs):
-        x = self.extract_feat(img)
+    def show_result(self, data, result, **kwargs):
+        """Show prediction results of the detector.
 
-        losses = dict()
+        Args:
+            data (str or np.ndarray): Image filename or loaded image.
+            result (Tensor or tuple): The results to draw over `img`
+                bbox_result or (bbox_result, segm_result).
 
-        # RPN forward and loss
-        if self.with_rpn:
-            proposal_cfg = self.train_cfg.get('rpn_proposal',
-                                              self.test_cfg.rpn)
-            rpn_losses, proposal_list = self.rpn_head.forward_train(
-                x,
-                img_metas,
-                gt_bboxes,
-                gt_labels=None,
-                gt_bboxes_ignore=gt_bboxes_ignore,
-                proposal_cfg=proposal_cfg,
-                **kwargs)
-            losses.update(rpn_losses)
+        Returns:
+            np.ndarray: The image with bboxes drawn on it.
+        """
+        if self.with_mask:
+            ms_bbox_result, ms_segm_result = result
+            if isinstance(ms_bbox_result, dict):
+                result = (ms_bbox_result['ensemble'],
+                          ms_segm_result['ensemble'])
         else:
-            proposal_list = proposals
-
-        roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
-                                                 gt_bboxes, gt_labels, gt_counts,
-                                                 gt_bboxes_ignore, gt_masks,
-                                                 **kwargs)
-        losses.update(roi_losses)
-
-        return losses
+            if isinstance(result, dict):
+                result = result['ensemble']
+        return super(CascadeRCNN, self).show_result(data, result, **kwargs)
