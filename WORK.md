@@ -32,6 +32,10 @@
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，具体同上。
+* `mmdet/models/dense_heads/anchor_head.py`\
+  **基类**。添加`AnchorHeadWithCount`类。大幅修改原类。
+* `mmdet/models/dense_heads/rpn_head.py`\
+  添加`RPNHeadWithCount`类，具体添加了cnt有关部分。
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
   **基类**。添加`BBoxHeadWithCount`类。大幅修改原类。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
@@ -88,136 +92,8 @@ python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py
 ```
 
 ## 现有问题
-疑似cuda越界，报错如下
+shape没对上？
 ```
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [0,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [1,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [2,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [3,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [4,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [5,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [6,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [7,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [8,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [9,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [10,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [11,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [12,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [13,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [14,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [15,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [16,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [17,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [18,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [19,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [20,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [21,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [22,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [23,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [24,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [25,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [26,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [27,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [28,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [29,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [30,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [31,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [32,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [33,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [34,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [35,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [36,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [37,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [38,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [39,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [40,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [41,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [42,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [43,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [44,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [45,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [46,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [47,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [48,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [49,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [50,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [51,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [52,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [53,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [54,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [55,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [56,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [57,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [58,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [59,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [60,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [61,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [62,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [63,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [64,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [65,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [66,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [67,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [68,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [69,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [70,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [71,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [72,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [73,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [74,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [75,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [76,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [77,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [78,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [79,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [80,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [81,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [82,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [83,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [84,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [85,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [86,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [87,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [88,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [89,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [90,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [91,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [92,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [93,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [94,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [95,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [96,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [97,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [98,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [99,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [100,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [101,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [102,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [103,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [104,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [105,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [106,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [107,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [108,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [109,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [110,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [111,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [112,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [113,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [114,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [115,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [116,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [117,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [118,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [119,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [120,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [121,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [122,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [123,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [124,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [125,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [126,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
-/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:84: operator(): block: [0,0,0], thread: [127,0,0] Assertion `index >= -sizes[i] && index < sizes[i] && "index out of bounds"` failed.
 Traceback (most recent call last):
   File "tools/train.py", line 244, in <module>
     main()
@@ -241,27 +117,23 @@ Traceback (most recent call last):
     return old_func(*args, **kwargs)
   File "/root/cms/mmdetection/mmdet/models/detectors/base.py", line 172, in forward
     return self.forward_train(img, img_metas, **kwargs)
-  File "/root/cms/mmdetection/mmdet/models/detectors/cascade_rcnn.py", line 104, in forward_train
-    roi_losses = self.roi_head.forward_train(x, img_metas, proposal_list,
-  File "/root/cms/mmdetection/mmdet/models/roi_heads/cascade_roi_head.py", line 760, in forward_train
-    assign_result = bbox_assigner.assign(
-  File "/root/cms/mmdetection/mmdet/core/bbox/assigners/max_iou_assigner.py", line 258, in assign
-    overlaps = self.iou_calculator(gt_bboxes, bboxes)
-  File "/root/cms/mmdetection/mmdet/core/bbox/iou_calculators/iou2d_calculator.py", line 65, in __call__
-    return bbox_overlaps(bboxes1, bboxes2, mode, is_aligned)
-  File "/root/cms/mmdetection/mmdet/core/bbox/iou_calculators/iou2d_calculator.py", line 250, in bbox_overlaps
-    eps = union.new_tensor([eps])
-RuntimeError: CUDA error: device-side assert triggered
-terminate called after throwing an instance of 'c10::Error'
-  what():  CUDA error: device-side assert triggered
-Exception raised from create_event_internal at /pytorch/c10/cuda/CUDACachingAllocator.cpp:687 (most recent call first):
-frame #0: c10::Error::Error(c10::SourceLocation, std::string) + 0x42 (0x7f6801c4f8b2 in /root/miniconda3/lib/python3.8/site-packages/torch/lib/libc10.so)
-frame #1: c10::cuda::CUDACachingAllocator::raw_delete(void*) + 0xad2 (0x7f6801ea1952 in /root/miniconda3/lib/python3.8/site-packages/torch/lib/libc10_cuda.so)
-frame #2: c10::TensorImpl::release_resources() + 0x4d (0x7f6801c3ab7d in /root/miniconda3/lib/python3.8/site-packages/torch/lib/libc10.so)
-frame #3: <unknown function> + 0x5fa0a2 (0x7f6804b580a2 in /root/miniconda3/lib/python3.8/site-packages/torch/lib/libtorch_python.so)
-frame #4: <unknown function> + 0x5fa156 (0x7f6804b58156 in /root/miniconda3/lib/python3.8/site-packages/torch/lib/libtorch_python.so)
-<omitting python frames>
-frame #23: __libc_start_main + 0xe7 (0x7f680e260b97 in /lib/x86_64-linux-gnu/libc.so.6)
-
-Aborted (core dumped)
+  File "/root/cms/mmdetection/mmdet/models/detectors/two_stage.py", line 253, in forward_train
+    rpn_losses, proposal_list = self.rpn_head.forward_train(
+  File "/root/cms/mmdetection/mmdet/models/dense_heads/base_dense_head.py", line 335, in forward_train
+    losses = self.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
+  File "/root/cms/mmdetection/mmdet/models/dense_heads/rpn_head.py", line 323, in loss
+    losses = super(RPNHeadWithCount, self).loss(
+  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/fp16_utils.py", line 208, in new_func
+    return old_func(*args, **kwargs)
+  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 878, in loss
+    cls_reg_cnt_targets = self.get_targets(
+  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 788, in get_targets
+    results = multi_apply(
+  File "/root/cms/mmdetection/mmdet/core/utils/misc.py", line 30, in multi_apply
+    return tuple(map(list, zip(*map_results)))
+  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 750, in _get_targets_single
+    counts = unmap(
+  File "/root/cms/mmdetection/mmdet/core/utils/misc.py", line 38, in unmap
+    ret[inds.type(torch.bool)] = data
+RuntimeError: shape mismatch: value tensor of shape [257796] cannot be broadcast to indexing result of shape [226128]
 ```

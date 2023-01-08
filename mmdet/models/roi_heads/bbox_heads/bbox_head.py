@@ -787,7 +787,7 @@ class BBoxHeadWithCount(BaseModule):
              bbox_pred,
              cnt_score,
              rois,
-             stages,
+             num_stages,
              labels,
              label_weights,
              bbox_targets,
@@ -800,14 +800,14 @@ class BBoxHeadWithCount(BaseModule):
         learning_cnt_weights=1.0
         learning_cls_weights=1.0
         learning_bbox_weights=1.0
-        if stages == 0:
+        if num_stages == 0:
             counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
             learning_cnt_weights=0.1
             learning_cls_weights=1.0
             learning_bbox_weights=1.0
 
-        elif stages == 1:
+        elif num_stages == 1:
             counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage2(count_weights),np.float32)).cuda()
             learning_cnt_weights=0.1
@@ -1163,28 +1163,28 @@ class BBoxHeadWithCount(BaseModule):
         counts = np.array(torch.tensor(countWeights, device='cpu'))
         # Counts_np = CountWeights.cpu().numpy()
         gtCountDivs = counts.copy()
-        return [[11*Val,9*Val,7*Val,5*Val,3*Val,1*Val] for Val in gtCountDivs]
+        return [[11*val,9*val,7*val,5*val,3*val,1*val] for val in gtCountDivs]
 
     def matchCountWeights_stage1(self, countWeights):
         ''' Stage1: Divide the range into 8 parts. '''
         counts = np.array(torch.tensor(countWeights, device='cpu'))
         # Counts_np = CountWeights.cpu().numpy()
         gtCountDivs = counts.copy()
-        return [[32*Val,16*Val,0*Val,0*Val,0*Val,0*Val] for Val in gtCountDivs]
+        return [[32*val,16*val,0*val,0*val,0*val,0*val] for val in gtCountDivs]
 
     def matchCountWeights_stage2(self, countWeights):
         ''' Stage1: Divide the range into 8 parts. '''
         counts = np.array(torch.tensor(countWeights, device='cpu'))
         # Counts_np = CountWeights.cpu().numpy()
         gtCountDivs = counts.copy()
-        return [[32*Val,16*Val,8*Val,4*Val,0*Val,0*Val] for Val in gtCountDivs]
+        return [[32*val,16*val,8*val,4*val,0*val,0*val] for val in gtCountDivs]
 
     def matchCountWeights_stage3(self, countWeights):
         ''' Stage1: Divide the range into 8 parts. '''
         counts = np.array(torch.tensor(countWeights, device='cpu'))
         # Counts_np = CountWeights.cpu().numpy()
         gtCountDivs = counts.copy()
-        return [[32*Val,16*Val,8*Val,4*Val,2*Val,1*Val] for Val in gtCountDivs]
+        return [[32*val,16*val,8*val,4*val,2*val,1*val] for val in gtCountDivs]
 
     def int2bin(self, val):
         valB = bin(val)
