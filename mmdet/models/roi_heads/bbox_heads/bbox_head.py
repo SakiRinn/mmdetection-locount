@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from mmcv.runner import BaseModule, auto_fp16, force_fp32
 from torch.nn.modules.utils import _pair
 
-from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms
+from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms, multiclass_nms_with_count
 from mmdet.models.builder import HEADS, build_loss
 from mmdet.models.losses import accuracy
 from mmdet.models.utils import build_linear_layer
@@ -676,7 +676,7 @@ class BBoxHeadWithCount(BaseModule):
                 in_features=in_channels,
                 out_features=out_dim_reg)
         if self.with_cnt:
-            self.fc_count = nn.Linear(in_channels, num_counts)
+            self.fc_cnt = nn.Linear(in_channels, num_counts)
         self.debug_imgs = None
         if init_cfg is None:
             self.init_cfg = []
@@ -766,12 +766,14 @@ class BBoxHeadWithCount(BaseModule):
         neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
         pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
         pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
+        pos_gt_counts_list = [res.pos_gt_counts for res in sampling_results]
         labels, label_weights, bbox_targets, bbox_weights, counts, count_weights = multi_apply(
             self._get_target_single,
             pos_bboxes_list,
             neg_bboxes_list,
             pos_gt_bboxes_list,
             pos_gt_labels_list,
+            pos_gt_counts_list,
             cfg=rcnn_train_cfg)
 
         if concat:
@@ -779,6 +781,8 @@ class BBoxHeadWithCount(BaseModule):
             label_weights = torch.cat(label_weights, 0)
             bbox_targets = torch.cat(bbox_targets, 0)
             bbox_weights = torch.cat(bbox_weights, 0)
+            counts = torch.cat(counts, 0)
+            count_weights = torch.cat(count_weights, 0)
         return labels, label_weights, bbox_targets, bbox_weights, counts, count_weights
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred', 'cnt_score'))
@@ -806,14 +810,12 @@ class BBoxHeadWithCount(BaseModule):
             learning_cnt_weights=0.1
             learning_cls_weights=1.0
             learning_bbox_weights=1.0
-
         elif num_stages == 1:
             counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage2(count_weights),np.float32)).cuda()
             learning_cnt_weights=0.1
             learning_cls_weights=0.5
             learning_bbox_weights=0.5
-
         else:
             counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage3(count_weights),np.float32)).cuda()
@@ -867,8 +869,8 @@ class BBoxHeadWithCount(BaseModule):
                     reduction_override=reduction_override)
             else:
                 losses['loss_bbox'] = bbox_pred[pos_inds].sum()
-        if cnt_score is None:
-            avg_factor = max(torch.sum(torch.stack(count_weights) > 0).float().item(), 1.)
+        if cnt_score is not None:
+            avg_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
             losses['loss_cnt'] = learning_cnt_weights * self.loss_cnt(
                 cnt_score,
                 counts,
@@ -918,10 +920,10 @@ class BBoxHeadWithCount(BaseModule):
         if cfg is None:
             return bboxes, scores, cnt_scores
         else:
-            det_bboxes, det_labels, det_counts = multiclass_nms(bboxes, scores,
+            det_bboxes, det_labels = multiclass_nms(bboxes, scores,
                                                     cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img)
-            return det_bboxes, det_labels, det_counts
+                                                    cfg.max_per_img)        # TODO: 补det_counts
+            return det_bboxes, det_labels
 
     @force_fp32(apply_to=('bbox_preds', ))
     def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):
@@ -1050,8 +1052,8 @@ class BBoxHeadWithCount(BaseModule):
             nn.init.normal_(self.fc_reg.weight, 0, 0.001)
             nn.init.constant_(self.fc_reg.bias, 0)
         if self.with_cnt:
-            nn.init.normal_(self.fc_count.weight, 0, 0.001)
-            nn.init.constant_(self.fc_count.bias, 0)
+            nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
+            nn.init.constant_(self.fc_cnt.bias, 0)
 
     def div_stage1(self, counts):
         ''' Stage1: Divide the range into 8 parts. '''

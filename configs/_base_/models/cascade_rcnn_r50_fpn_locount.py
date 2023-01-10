@@ -68,8 +68,8 @@ model = dict(
                     beta=1.0,
                     loss_weight=1.0),
                 loss_cnt=dict(
-                    type='SmoothL1Loss',
-                    beta=1.0,
+                    type='CrossEntropyLoss',
+                    use_sigmoid=False,
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
@@ -97,8 +97,8 @@ model = dict(
                     beta=1.0,
                     loss_weight=1.0),
                 loss_cnt=dict(
-                    type='SmoothL1Loss',
-                    beta=1.0,
+                    type='CrossEntropyLoss',
+                    use_sigmoid=False,
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
@@ -126,8 +126,8 @@ model = dict(
                     beta=1.0,
                     loss_weight=1.0),
                 loss_cnt=dict(
-                    type='SmoothL1Loss',
-                    beta=1.0,
+                    type='CrossEntropyLoss',
+                    use_sigmoid=False,
                     loss_weight=1.0)),
         ]),
     # model training and testing settings

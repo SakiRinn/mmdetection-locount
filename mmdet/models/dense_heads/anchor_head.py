@@ -8,8 +8,9 @@ from mmcv.runner import force_fp32
 from mmdet.core import (anchor_inside_flags, build_assigner, build_bbox_coder,
                         build_prior_generator, build_sampler, images_to_levels,
                         multi_apply, unmap)
+from mmdet.core.utils import filter_scores_and_topk, select_single_mlvl
 from ..builder import HEADS, build_loss
-from .base_dense_head import BaseDenseHead
+from .base_dense_head import BaseDenseHead, BaseDenseHeadWithCount
 from .dense_test_mixins import BBoxTestMixin
 
 
@@ -548,7 +549,7 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
 
 
 @HEADS.register_module()
-class AnchorHeadWithCount(AnchorHead):
+class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
 
     def __init__(self,
                  num_classes,
@@ -748,7 +749,7 @@ class AnchorHeadWithCount(AnchorHead):
             bbox_targets = unmap(bbox_targets, num_total_anchors, inside_flags)
             bbox_weights = unmap(bbox_weights, num_total_anchors, inside_flags)
             counts = unmap(
-                labels, num_total_anchors, inside_flags,
+                counts, num_total_anchors, inside_flags,
                 fill=self.num_counts)
             count_weights = unmap(count_weights, num_total_anchors,
                                   inside_flags)

@@ -32,16 +32,18 @@
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，具体同上。
+* `mmdet/models/dense_heads/base_dense_head.py`\
+  **基类**。添加`BaseDenseHeadWithCount`类。
 * `mmdet/models/dense_heads/anchor_head.py`\
-  **基类**。添加`AnchorHeadWithCount`类。大幅修改原类。
+  添加`AnchorHeadWithCount`类。
 * `mmdet/models/dense_heads/rpn_head.py`\
-  添加`RPNHeadWithCount`类，具体添加了cnt有关部分。
+  添加`RPNHeadWithCount`类。
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
-  **基类**。添加`BBoxHeadWithCount`类。大幅修改原类。
+  **基类**。添加`BBoxHeadWithCount`类。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
   添加`FCBBoxHeadWithCount`类，具体添加了一个cnt头。
 * `mmdet/models/roi_heads/cascade_roi_head.py`\
-  添加`CascadeRoIHeadWithCount`类，具体添加了cnt有关部分。
+  添加`CascadeRoIHeadWithCount`类。
 
 ## 数据采样
 该部分修改主要在`mmdet/core/`下进行。

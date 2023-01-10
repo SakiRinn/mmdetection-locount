@@ -302,7 +302,7 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
         self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_base_priors * 4,
                                  1)
         self.rpn_cnt = nn.Conv2d(self.feat_channels,
-                                 self.cls_out_channels,
+                                 self.num_base_priors * self.cnt_out_channels,
                                  1)
 
     def forward_single(self, x):
@@ -337,6 +337,7 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
                            bbox_pred_list,
                            cnt_score_list,
                            score_factor_list,
+                           cnt_score_factor_list,
                            mlvl_anchors,
                            img_meta,
                            cfg,
@@ -357,8 +358,9 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
             rpn_cls_score = cls_score_list[level_idx]
             rpn_bbox_pred = bbox_pred_list[level_idx]
             rpn_cnt_score = cnt_score_list[level_idx]
-            assert (rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:]) and \
-                   (rpn_cnt_score.size()[-2:] == rpn_bbox_pred.size()[-2:])
+            assert (rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:])
+            # bbox
+            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             # cls
             rpn_cls_score = rpn_cls_score.permute(1, 2, 0)
             if self.use_sigmoid_cls:
@@ -367,8 +369,6 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
             else:
                 rpn_cls_score = rpn_cls_score.reshape(-1, 2)
                 scores = rpn_cls_score.softmax(dim=1)[:, 0]
-            # bbox
-            rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             # rpn
             rpn_cnt_score = rpn_cnt_score.permute(1, 2, 0)
             if self.use_sigmoid_cnt:
@@ -381,10 +381,9 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
             anchors = mlvl_anchors[level_idx]
             if 0 < nms_pre < scores.shape[0]:
                 ranked_scores, rank_inds = scores.sort(descending=True)
-                ranked_cnt_scores, rank_cnt_inds = scores.sort(descending=True)
                 topk_inds = rank_inds[:nms_pre]
                 scores = ranked_scores[:nms_pre]
-                cnt_scores = ranked_cnt_scores[:nms_pre]
+                cnt_scores = cnt_scores[topk_inds]
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
                 anchors = anchors[topk_inds, :]
 
@@ -397,13 +396,13 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
                                 level_idx,
                                 dtype=torch.long))
 
-        return self._bbox_post_process(mlvl_scores, mlvl_bbox_preds, mlvl_cnt_scores,
+        return self._bbox_post_process(mlvl_scores, mlvl_bbox_preds,
                                        mlvl_valid_anchors, level_ids, cfg, img_shape)
 
-    def _bbox_post_process(self, mlvl_scores, mlvl_bboxes, mlvl_cnt_scores,
+    def _bbox_post_process(self, mlvl_scores, mlvl_bboxes,
                            mlvl_valid_anchors, level_ids, cfg, img_shape, **kwargs):
         scores = torch.cat(mlvl_scores)
-        cnt_scores = torch.cat(mlvl_cnt_scores)
+        # cnt_scores = torch.cat(mlvl_cnt_scores)
         anchors = torch.cat(mlvl_valid_anchors)
         rpn_bbox_pred = torch.cat(mlvl_bboxes)
         proposals = self.bbox_coder.decode(
@@ -417,7 +416,7 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
             if not valid_mask.all():
                 proposals = proposals[valid_mask]
                 scores = scores[valid_mask]
-                cnt_scores = cnt_scores[valid_mask]
+                # cnt_scores = cnt_scores[valid_mask]
                 ids = ids[valid_mask]
 
         if proposals.numel() > 0:

@@ -661,12 +661,10 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         )
 
     def _bbox_forward(self, stage, x, rois):
-        """Box head forward function used in both training and testing."""
         bbox_roi_extractor = self.bbox_roi_extractor[stage]
         bbox_head = self.bbox_head[stage]
         bbox_feats = bbox_roi_extractor(x[:bbox_roi_extractor.num_inputs],
                                         rois)
-        # do not support caffe_c4 model anymore
         cls_score, bbox_pred, cnt_score = bbox_head(bbox_feats)                 # ADD
 
         bbox_results = dict(
@@ -675,7 +673,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
 
     def _bbox_forward_train(self, stage, x, sampling_results,
                             gt_bboxes, gt_labels, gt_counts, rcnn_train_cfg):
-        """Run forward function and calculate loss for box head in training."""
         rois = bbox2roi([res.bboxes for res in sampling_results])
         bbox_results = self._bbox_forward(stage, x, rois)
         bbox_targets = self.bbox_head[stage].get_targets(sampling_results,
@@ -687,6 +684,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                                                bbox_results['bbox_pred'],
                                                bbox_results['cnt_score'],       # ADD
                                                rois,
+                                               self.num_stages,
                                                *bbox_targets)
 
         bbox_results.update(
@@ -694,7 +692,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         return bbox_results
 
     def forward_dummy(self, x, proposals):
-        """Dummy forward function."""
         # bbox head
         outs = ()
         rois = bbox2roi([proposals])
@@ -721,33 +718,12 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                       gt_counts,                # ADD
                       gt_bboxes_ignore=None,
                       gt_masks=None):
-        """
-        Args:
-            x (list[Tensor]): list of multi-level img features.
-            img_metas (list[dict]): list of image info dict where each dict
-                has: 'img_shape', 'scale_factor', 'flip', and may also contain
-                'filename', 'ori_shape', 'pad_shape', and 'img_norm_cfg'.
-                For details on the values of these keys see
-                `mmdet/datasets/pipelines/formatting.py:Collect`.
-            proposals (list[Tensors]): list of region proposals.
-            gt_bboxes (list[Tensor]): Ground truth bboxes for each image with
-                shape (num_gts, 4) in [tl_x, tl_y, br_x, br_y] format.
-            gt_labels (list[Tensor]): class indices corresponding to each box
-            gt_bboxes_ignore (None | list[Tensor]): specify which bounding
-                boxes can be ignored when computing the loss.
-            gt_masks (None | Tensor) : true segmentation masks for each box
-                used if the architecture supports a segmentation task.
-
-        Returns:
-            dict[str, Tensor]: a dictionary of loss components
-        """
         losses = dict()
         for i in range(self.num_stages):
             self.current_stage = i
             rcnn_train_cfg = self.train_cfg[i]
             lw = self.stage_loss_weights[i]
 
-            # assign gts and sample proposals
             sampling_results = []
             if self.with_bbox or self.with_mask:
                 bbox_assigner = self.bbox_assigner[i]
@@ -769,7 +745,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                         feats=[lvl_feat[j][None] for lvl_feat in x])
                     sampling_results.append(sampling_result)
 
-            # bbox head forward and loss
             bbox_results = self._bbox_forward_train(i, x, sampling_results,
                                                     gt_bboxes, gt_labels, gt_counts,
                                                     rcnn_train_cfg)
@@ -812,35 +787,12 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         return losses
 
     def simple_test(self, x, proposal_list, img_metas, rescale=False):
-        """Test without augmentation.
-
-        Args:
-            x (tuple[Tensor]): Features from upstream network. Each
-                has shape (batch_size, c, h, w).
-            proposal_list (list(Tensor)): Proposals from rpn head.
-                Each has shape (num_proposals, 5), last dimension
-                5 represent (x1, y1, x2, y2, score).
-            img_metas (list[dict]): Meta information of images.
-            rescale (bool): Whether to rescale the results to
-                the original image. Default: True.
-
-        Returns:
-            list[list[np.ndarray]] or list[tuple]: When no mask branch,
-            it is bbox results of each image and classes with type
-            `list[list[np.ndarray]]`. The outer list
-            corresponds to each image. The inner list
-            corresponds to each class. When the model has mask branch,
-            it contains bbox results and mask results.
-            The outer list corresponds to each image, and first element
-            of tuple is bbox results, second element is mask results.
-        """
         assert self.with_bbox, 'Bbox head must be implemented.'
         num_imgs = len(proposal_list)
         img_shapes = tuple(meta['img_shape'] for meta in img_metas)
         ori_shapes = tuple(meta['ori_shape'] for meta in img_metas)
         scale_factors = tuple(meta['scale_factor'] for meta in img_metas)
 
-        # "ms" in variable names means multi-stage
         ms_bbox_result = {}
         ms_segm_result = {}
         ms_scores = []
@@ -849,7 +801,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         rois = bbox2roi(proposal_list)
 
         if rois.shape[0] == 0:
-            # There is no proposal in the whole batch
             bbox_results = [[
                 np.zeros((0, 5), dtype=np.float32)
                 for _ in range(self.bbox_head[-1].num_classes)
@@ -868,7 +819,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         for i in range(self.num_stages):
             bbox_results = self._bbox_forward(i, x, rois)
 
-            # split batch bbox prediction back to each image
             cls_score = bbox_results['cls_score']
             bbox_pred = bbox_results['bbox_pred']
             cnt_score = bbox_results['cnt_score']
@@ -898,13 +848,11 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                         refine_rois_list.append(refined_rois)
                 rois = torch.cat(refine_rois_list)
 
-        # average scores of each image by stages
         cls_score = [
             sum([score[i] for score in ms_scores]) / float(len(ms_scores))
             for i in range(num_imgs)
         ]
 
-        # apply bbox post-processing to each image individually
         det_bboxes = []
         det_labels = []
         det_counts = [] # 0529 add
@@ -986,17 +934,11 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         return results
 
     def aug_test(self, features, proposal_list, img_metas, rescale=False):
-        """Test with augmentations.
-
-        If rescale is False, then returned bboxes and masks will fit the scale
-        of imgs[0].
-        """
         rcnn_test_cfg = self.test_cfg
         aug_bboxes = []
         aug_scores = []
         aug_cnt_scores = []                             # ADD
         for x, img_meta in zip(features, img_metas):
-            # only one image in the batch
             img_shape = img_meta[0]['img_shape']
             scale_factor = img_meta[0]['scale_factor']
             flip = img_meta[0]['flip']
@@ -1004,14 +946,12 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
 
             proposals = bbox_mapping(proposal_list[0][:, :4], img_shape,
                                      scale_factor, flip, flip_direction)
-            # "ms" in variable names means multi-stage
             ms_scores = []
             ms_cnt_scores = []                          # ADD
 
             rois = bbox2roi([proposals])
 
             if rois.shape[0] == 0:
-                # There is no proposal in the single image
                 aug_bboxes.append(rois.new_zeros(0, 4))
                 aug_scores.append(rois.new_zeros(0, 1))
                 aug_cnt_scores.append(rois.new_zeros(0, 1))
@@ -1047,7 +987,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             aug_scores.append(scores)
             aug_cnt_scores.append(cnt_scores)
 
-        # after merging, bboxes will be rescaled to the original image size
         merged_bboxes, merged_scores = merge_aug_bboxes(
             aug_bboxes, aug_scores, img_metas, rcnn_test_cfg)
         det_bboxes, det_labels = multiclass_nms(merged_bboxes, merged_scores,
