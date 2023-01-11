@@ -1058,7 +1058,7 @@ class BBoxHeadWithCount(BaseModule):
 
     def div_stage1(self, counts):
         ''' Stage1: Divide the range into 8 parts. '''
-        counts = np.array(torch.tensor(counts, device='cpu'))
+        counts = counts.cpu().numpy()
         # Counts_np = Counts.cpu().numpy()
         gtCountDivs = counts.copy()
         # print(Counts_np.shape, Counts_np[0], Counts_np[0].shape)
