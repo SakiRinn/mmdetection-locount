@@ -63,8 +63,6 @@
   `bbox2result`函数中添加`counts`参数。
 * `mmdet/core/evaluation/class_names.py`\
   修改`coco_classes`中的类型。
-* `mmdet/core/post_processing/bbox_nms.py`\
-  添加`multiclass_nms_with_count`函数。
 
 ## 配置文件
 该部分修改主要在`configs/`下进行。
@@ -94,48 +92,4 @@ python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py
 ```
 
 ## 现有问题
-shape没对上？
-```
-Traceback (most recent call last):
-  File "tools/train.py", line 244, in <module>
-    main()
-  File "tools/train.py", line 233, in main
-    train_detector(
-  File "/root/cms/mmdetection/mmdet/apis/train.py", line 246, in train_detector
-    runner.run(data_loaders, cfg.workflow)
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/epoch_based_runner.py", line 136, in run
-    epoch_runner(data_loaders[i], **kwargs)
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/epoch_based_runner.py", line 53, in train
-    self.run_iter(data_batch, train_mode=True, **kwargs)
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/epoch_based_runner.py", line 31, in run_iter
-    outputs = self.model.train_step(data_batch, self.optimizer,
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/parallel/data_parallel.py", line 77, in train_step
-    return self.module.train_step(*inputs[0], **kwargs[0])
-  File "/root/cms/mmdetection/mmdet/models/detectors/base.py", line 248, in train_step
-    losses = self(**data)
-  File "/root/miniconda3/lib/python3.8/site-packages/torch/nn/modules/module.py", line 727, in _call_impl
-    result = self.forward(*input, **kwargs)
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/fp16_utils.py", line 119, in new_func
-    return old_func(*args, **kwargs)
-  File "/root/cms/mmdetection/mmdet/models/detectors/base.py", line 172, in forward
-    return self.forward_train(img, img_metas, **kwargs)
-  File "/root/cms/mmdetection/mmdet/models/detectors/two_stage.py", line 253, in forward_train
-    rpn_losses, proposal_list = self.rpn_head.forward_train(
-  File "/root/cms/mmdetection/mmdet/models/dense_heads/base_dense_head.py", line 335, in forward_train
-    losses = self.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
-  File "/root/cms/mmdetection/mmdet/models/dense_heads/rpn_head.py", line 323, in loss
-    losses = super(RPNHeadWithCount, self).loss(
-  File "/root/miniconda3/lib/python3.8/site-packages/mmcv/runner/fp16_utils.py", line 208, in new_func
-    return old_func(*args, **kwargs)
-  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 878, in loss
-    cls_reg_cnt_targets = self.get_targets(
-  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 788, in get_targets
-    results = multi_apply(
-  File "/root/cms/mmdetection/mmdet/core/utils/misc.py", line 30, in multi_apply
-    return tuple(map(list, zip(*map_results)))
-  File "/root/cms/mmdetection/mmdet/models/dense_heads/anchor_head.py", line 750, in _get_targets_single
-    counts = unmap(
-  File "/root/cms/mmdetection/mmdet/core/utils/misc.py", line 38, in unmap
-    ret[inds.type(torch.bool)] = data
-RuntimeError: shape mismatch: value tensor of shape [257796] cannot be broadcast to indexing result of shape [226128]
-```
+暂无。删除了nms对counts的作用。

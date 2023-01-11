@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from mmcv.runner import BaseModule, auto_fp16, force_fp32
 from torch.nn.modules.utils import _pair
 
-from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms, multiclass_nms_with_count
+from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms
 from mmdet.models.builder import HEADS, build_loss
 from mmdet.models.losses import accuracy
 from mmdet.models.utils import build_linear_layer
@@ -897,12 +897,6 @@ class BBoxHeadWithCount(BaseModule):
             scores = F.softmax(
                 cls_score, dim=-1) if cls_score is not None else None
 
-        if isinstance(cnt_score, list):
-            cnt_score = sum(cnt_score) / float(len(cnt_score))
-        cnt_scores = F.softmax(cnt_score, dim=-1) if cnt_score is not None else None
-        argMax = torch.argmax(cnt_scores, dim=-1) + 1
-        cnt_scores = argMax.unsqueeze(-1).type(torch.float)
-
         if bbox_pred is not None:
             bboxes = self.bbox_coder.decode(
                 rois[..., 1:], bbox_pred, max_shape=img_shape)
@@ -917,13 +911,20 @@ class BBoxHeadWithCount(BaseModule):
             bboxes = (bboxes.view(bboxes.size(0), -1, 4) / scale_factor).view(
                 bboxes.size()[0], -1)
 
+        if isinstance(cnt_score, list):
+            cnt_score = sum(cnt_score) / float(len(cnt_score))
+        count = F.softmax(cnt_score, dim=-1) if cnt_score is not None else None
+        argMax = torch.argmax(count, dim=-1) + 1
+        count = argMax.unsqueeze(-1).type(torch.float)     # Just one number.
+
         if cfg is None:
-            return bboxes, scores, cnt_scores
+            counts = count.expand(bboxes.size(0))
+            return bboxes, scores, counts
         else:
             det_bboxes, det_labels = multiclass_nms(bboxes, scores,
-                                                    cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img)        # TODO: 补det_counts
-            return det_bboxes, det_labels
+                                                    cfg.score_thr, cfg.nms, cfg.max_per_img)
+            det_counts = count.expand(det_bboxes.size(0))
+            return det_bboxes, det_labels, det_counts
 
     @force_fp32(apply_to=('bbox_preds', ))
     def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):

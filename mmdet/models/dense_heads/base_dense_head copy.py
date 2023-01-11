@@ -531,11 +531,13 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
     def __init__(self, init_cfg=None):
         super(BaseDenseHeadWithCount, self).__init__(init_cfg)
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'cnt_scores'))
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
+                   cnt_scores,
                    score_factors=None,
+                   cnt_score_factors=None,
                    img_metas=None,
                    cfg=None,
                    rescale=False,
@@ -548,14 +550,14 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
         else:
             with_score_factors = True
             assert len(cls_scores) == len(score_factors)
-        # if cnt_score_factors is None:
-        #     with_cnt_score_factors = False
-        # else:
-        #     with_cnt_score_factors = True
-        #     assert len(cnt_scores) == len(cnt_score_factors)
+        if cnt_score_factors is None:
+            with_cnt_score_factors = False
+        else:
+            with_cnt_score_factors = True
+            assert len(cnt_scores) == len(cnt_score_factors)
 
         num_levels = len(cls_scores)
-        # num_cnt_levels = len(cnt_scores)
+        num_cnt_levels = len(cnt_scores)
 
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
         mlvl_priors = self.prior_generator.grid_priors(
@@ -569,18 +571,18 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             img_meta = img_metas[img_id]
             cls_score_list = select_single_mlvl(cls_scores, img_id)
             bbox_pred_list = select_single_mlvl(bbox_preds, img_id)
-            # cnt_score_list = select_single_mlvl(cnt_scores, img_id)
+            cnt_score_list = select_single_mlvl(cnt_scores, img_id)
             if with_score_factors:
                 score_factor_list = select_single_mlvl(score_factors, img_id)
             else:
                 score_factor_list = [None for _ in range(num_levels)]
-            # if with_cnt_score_factors:
-            #     cnt_score_factor_list = select_single_mlvl(cnt_score_factors, img_id)
-            # else:
-            #     cnt_score_factor_list = [None for _ in range(num_cnt_levels)]
+            if with_cnt_score_factors:
+                cnt_score_factor_list = select_single_mlvl(cnt_score_factors, img_id)
+            else:
+                cnt_score_factor_list = [None for _ in range(num_cnt_levels)]
 
-            results = self._get_bboxes_single(cls_score_list, bbox_pred_list,
-                                              score_factor_list, mlvl_priors,
+            results = self._get_bboxes_single(cls_score_list, bbox_pred_list, cnt_score_list,
+                                              score_factor_list, cnt_score_factor_list, mlvl_priors,
                                               img_meta, cfg, rescale, with_nms,
                                               **kwargs)
             result_list.append(results)
@@ -589,7 +591,9 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
     def _get_bboxes_single(self,
                            cls_score_list,
                            bbox_pred_list,
+                           cnt_score_list,
                            score_factor_list,
+                           cnt_score_factor_list,
                            mlvl_priors,
                            img_meta,
                            cfg,
@@ -600,10 +604,10 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             with_score_factors = False
         else:
             with_score_factors = True
-        # if cnt_score_factor_list[0] is None:
-        #     with_cnt_score_factors = False
-        # else:
-        #     with_cnt_score_factors = True
+        if cnt_score_factor_list[0] is None:
+            with_cnt_score_factors = False
+        else:
+            with_cnt_score_factors = True
 
         cfg = self.test_cfg if cfg is None else cfg
         img_shape = img_meta['img_shape']
@@ -612,14 +616,20 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_labels = []
-        # mlvl_cnt_scores = []
+        mlvl_cnt_scores = []
+        mlvl_counts = []
         if with_score_factors:
             mlvl_score_factors = []
         else:
             mlvl_score_factors = None
+        if with_cnt_score_factors:
+            mlvl_cnt_score_factors = []
+        else:
+            mlvl_cnt_score_factors = None
 
         for level_idx, (cls_score, bbox_pred, cnt_score, score_factor, cnt_score_factor, priors) in \
-                enumerate(zip(cls_score_list, bbox_pred_list, score_factor_list, mlvl_priors)):
+                enumerate(zip(cls_score_list, bbox_pred_list, cnt_score_list,
+                              score_factor_list, cnt_score_factor_list, mlvl_priors)):
 
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             # bbox
@@ -635,20 +645,20 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             else:
                 scores = cls_score.softmax(-1)[:, :-1]
             # cnt
-            # if with_cnt_score_factors:
-            #     cnt_score_factor = cnt_score_factor.permute(1, 2,
-            #                                         0).reshape(-1).sigmoid()
-            # cnt_score = cnt_score.permute(1, 2,
-            #                               0).reshape(-1, self.cnt_out_channels)
-            # if self.use_sigmoid_cnt:
-            #     cnt_scores = cnt_score.sigmoid()
-            # else:
-            #     cnt_scores = cnt_score.softmax(-1)[:, :-1]
+            if with_cnt_score_factors:
+                cnt_score_factor = cnt_score_factor.permute(1, 2,
+                                                    0).reshape(-1).sigmoid()
+            cnt_score = cnt_score.permute(1, 2,
+                                          0).reshape(-1, self.cnt_out_channels)
+            if self.use_sigmoid_cnt:
+                cnt_scores = cnt_score.sigmoid()
+            else:
+                cnt_scores = cnt_score.softmax(-1)[:, :-1]
 
-            results = filter_scores_and_topk(
-                scores, cfg.score_thr, nms_pre,
+            results = self._filter_scores_and_topk(
+                scores, cnt_scores, cfg.score_thr, nms_pre,
                 dict(bbox_pred=bbox_pred, priors=priors))
-            scores, labels, keep_idxs, filtered_results = results
+            scores, labels, cnt_scores, counts, keep_idxs, filtered_results = results
 
             bbox_pred = filtered_results['bbox_pred']
             priors = filtered_results['priors']
@@ -662,10 +672,85 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
             mlvl_labels.append(labels)
-            # mlvl_cnt_scores.append(cnt_scores)
+            mlvl_cnt_scores.append(cnt_scores)
+            mlvl_counts.append(counts)
             if with_score_factors:
                 mlvl_score_factors.append(score_factor)
 
-        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
+        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_cnt_scores, mlvl_counts, mlvl_bboxes,
                                        img_meta['scale_factor'], cfg, rescale,
-                                       with_nms, mlvl_score_factors, **kwargs)
+                                       with_nms, mlvl_score_factors, mlvl_cnt_score_factors, **kwargs)
+
+    def _bbox_post_process(self,
+                           mlvl_scores,
+                           mlvl_labels,
+                           mlvl_cnt_scores,
+                           mlvl_counts,
+                           mlvl_bboxes,
+                           scale_factor,
+                           cfg,
+                           rescale=False,
+                           with_nms=True,
+                           mlvl_score_factors=None,
+                           mlvl_cnt_score_factors=None,
+                           **kwargs):
+        assert len(mlvl_scores) == len(mlvl_bboxes) == len(mlvl_labels) == len(mlvl_cnt_scores) == len(mlvl_counts)
+
+        mlvl_bboxes = torch.cat(mlvl_bboxes)
+        if rescale:
+            mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
+        mlvl_scores = torch.cat(mlvl_scores)
+        mlvl_labels = torch.cat(mlvl_labels)
+        mlvl_cnt_scores = torch.cat(mlvl_cnt_scores)
+        mlvl_counts = torch.cat(mlvl_counts)
+
+        if mlvl_score_factors is not None:
+            mlvl_score_factors = torch.cat(mlvl_score_factors)
+            mlvl_scores = mlvl_scores * mlvl_score_factors
+        if mlvl_cnt_score_factors is not None:
+            mlvl_cnt_score_factors = torch.cat(mlvl_cnt_score_factors)
+            mlvl_cnt_scores = mlvl_cnt_scores * mlvl_cnt_score_factors
+
+        if with_nms:
+            if mlvl_bboxes.numel() == 0:
+                det_bboxes = torch.cat([mlvl_bboxes, mlvl_scores[:, None], mlvl_cnt_scores[:, None]], -1)
+                return det_bboxes, mlvl_labels, mlvl_counts
+
+            det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
+                                                mlvl_labels, cfg.nms)
+            det_bboxes = torch.cat([det_bboxes, mlvl_cnt_scores], dim=0)
+            det_bboxes = det_bboxes[:cfg.max_per_img]
+            det_labels = mlvl_labels[keep_idxs][:cfg.max_per_img]
+            det_counts = mlvl_counts[keep_idxs][:cfg.max_per_img]
+            return det_bboxes, det_labels, det_counts
+        else:
+            return mlvl_bboxes, mlvl_scores, mlvl_labels, mlvl_cnt_scores, mlvl_counts
+
+    def _filter_scores_and_topk(scores, cnt_scores, score_thr, topk, results=None):
+        valid_mask = scores > score_thr
+        scores = scores[valid_mask]
+        cnt_scores = cnt_scores[valid_mask]
+        valid_idxs = torch.nonzero(valid_mask)
+
+        num_topk = min(topk, valid_idxs.size(0))
+        # torch.sort is actually faster than .topk (at least on GPUs)
+        scores, idxs = scores.sort(descending=True)
+        scores = scores[:num_topk]
+        topk_idxs = valid_idxs[idxs[:num_topk]]
+        keep_idxs, labels = topk_idxs.unbind(dim=1)
+        cnt_scores = cnt_scores[keep_idxs]
+
+        counts = torch.nonzero(valid_mask)
+
+        filtered_results = None
+        if results is not None:
+            if isinstance(results, dict):
+                filtered_results = {k: v[keep_idxs] for k, v in results.items()}
+            elif isinstance(results, list):
+                filtered_results = [result[keep_idxs] for result in results]
+            elif isinstance(results, torch.Tensor):
+                filtered_results = results[keep_idxs]
+            else:
+                raise NotImplementedError(f'Only supports dict or list or Tensor, '
+                                        f'but get {type(results)}.')
+        return scores, labels, cnt_scores, counts, keep_idxs, filtered_results
