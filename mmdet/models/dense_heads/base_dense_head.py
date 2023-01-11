@@ -531,13 +531,11 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
     def __init__(self, init_cfg=None):
         super(BaseDenseHeadWithCount, self).__init__(init_cfg)
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'cnt_scores'))
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
-                   cnt_scores,
                    score_factors=None,
-                   cnt_score_factors=None,
                    img_metas=None,
                    cfg=None,
                    rescale=False,
@@ -550,14 +548,14 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
         else:
             with_score_factors = True
             assert len(cls_scores) == len(score_factors)
-        if cnt_score_factors is None:
-            with_cnt_score_factors = False
-        else:
-            with_cnt_score_factors = True
-            assert len(cnt_scores) == len(cnt_score_factors)
+        # if cnt_score_factors is None:
+        #     with_cnt_score_factors = False
+        # else:
+        #     with_cnt_score_factors = True
+        #     assert len(cnt_scores) == len(cnt_score_factors)
 
         num_levels = len(cls_scores)
-        num_cnt_levels = len(cnt_scores)
+        # num_cnt_levels = len(cnt_scores)
 
         featmap_sizes = [cls_scores[i].shape[-2:] for i in range(num_levels)]
         mlvl_priors = self.prior_generator.grid_priors(
@@ -571,18 +569,18 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             img_meta = img_metas[img_id]
             cls_score_list = select_single_mlvl(cls_scores, img_id)
             bbox_pred_list = select_single_mlvl(bbox_preds, img_id)
-            cnt_score_list = select_single_mlvl(cnt_scores, img_id)
+            # cnt_score_list = select_single_mlvl(cnt_scores, img_id)
             if with_score_factors:
                 score_factor_list = select_single_mlvl(score_factors, img_id)
             else:
                 score_factor_list = [None for _ in range(num_levels)]
-            if with_cnt_score_factors:
-                cnt_score_factor_list = select_single_mlvl(cnt_score_factors, img_id)
-            else:
-                cnt_score_factor_list = [None for _ in range(num_cnt_levels)]
+            # if with_cnt_score_factors:
+            #     cnt_score_factor_list = select_single_mlvl(cnt_score_factors, img_id)
+            # else:
+            #     cnt_score_factor_list = [None for _ in range(num_cnt_levels)]
 
-            results = self._get_bboxes_single(cls_score_list, bbox_pred_list, cnt_score_list,
-                                              score_factor_list, cnt_score_factor_list, mlvl_priors,
+            results = self._get_bboxes_single(cls_score_list, bbox_pred_list,
+                                              score_factor_list, mlvl_priors,
                                               img_meta, cfg, rescale, with_nms,
                                               **kwargs)
             result_list.append(results)
@@ -591,9 +589,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
     def _get_bboxes_single(self,
                            cls_score_list,
                            bbox_pred_list,
-                           cnt_score_list,
                            score_factor_list,
-                           cnt_score_factor_list,
                            mlvl_priors,
                            img_meta,
                            cfg,
@@ -604,10 +600,10 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             with_score_factors = False
         else:
             with_score_factors = True
-        if cnt_score_factor_list[0] is None:
-            with_cnt_score_factors = False
-        else:
-            with_cnt_score_factors = True
+        # if cnt_score_factor_list[0] is None:
+        #     with_cnt_score_factors = False
+        # else:
+        #     with_cnt_score_factors = True
 
         cfg = self.test_cfg if cfg is None else cfg
         img_shape = img_meta['img_shape']
@@ -616,15 +612,14 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_labels = []
-        mlvl_cnt_scores = []
+        # mlvl_cnt_scores = []
         if with_score_factors:
             mlvl_score_factors = []
         else:
             mlvl_score_factors = None
 
         for level_idx, (cls_score, bbox_pred, cnt_score, score_factor, cnt_score_factor, priors) in \
-                enumerate(zip(cls_score_list, bbox_pred_list, cnt_score_list,
-                              score_factor_list, cnt_score_factor_list, mlvl_priors)):
+                enumerate(zip(cls_score_list, bbox_pred_list, score_factor_list, mlvl_priors)):
 
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             # bbox
@@ -640,20 +635,20 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             else:
                 scores = cls_score.softmax(-1)[:, :-1]
             # cnt
-            if with_cnt_score_factors:
-                cnt_score_factor = cnt_score_factor.permute(1, 2,
-                                                    0).reshape(-1).sigmoid()
-            cnt_score = cnt_score.permute(1, 2,
-                                          0).reshape(-1, self.cnt_out_channels)
-            if self.use_sigmoid_cnt:
-                cnt_scores = cnt_score.sigmoid()
-            else:
-                cnt_scores = cnt_score.softmax(-1)[:, :-1]
+            # if with_cnt_score_factors:
+            #     cnt_score_factor = cnt_score_factor.permute(1, 2,
+            #                                         0).reshape(-1).sigmoid()
+            # cnt_score = cnt_score.permute(1, 2,
+            #                               0).reshape(-1, self.cnt_out_channels)
+            # if self.use_sigmoid_cnt:
+            #     cnt_scores = cnt_score.sigmoid()
+            # else:
+            #     cnt_scores = cnt_score.softmax(-1)[:, :-1]
 
-            results = self._filter_scores_and_topk(
-                scores, cnt_scores, cfg.score_thr, nms_pre,
+            results = filter_scores_and_topk(
+                scores, cfg.score_thr, nms_pre,
                 dict(bbox_pred=bbox_pred, priors=priors))
-            scores, labels, cnt_scores, keep_idxs, filtered_results = results
+            scores, labels, keep_idxs, filtered_results = results
 
             bbox_pred = filtered_results['bbox_pred']
             priors = filtered_results['priors']
@@ -667,7 +662,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
             mlvl_labels.append(labels)
-            mlvl_cnt_scores.append(cnt_scores)
+            # mlvl_cnt_scores.append(cnt_scores)
             if with_score_factors:
                 mlvl_score_factors.append(score_factor)
 

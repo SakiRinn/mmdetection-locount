@@ -301,43 +301,40 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
                                  1)
         self.rpn_reg = nn.Conv2d(self.feat_channels, self.num_base_priors * 4,
                                  1)
-        self.rpn_cnt = nn.Conv2d(self.feat_channels,
-                                 self.num_base_priors * self.cnt_out_channels,
-                                 1)
+        # self.rpn_cnt = nn.Conv2d(self.feat_channels,
+        #                          self.num_base_priors * self.cnt_out_channels,
+        #                          1)
 
     def forward_single(self, x):
         x = self.rpn_conv(x)
         x = F.relu(x, inplace=False)
         rpn_cls_score = self.rpn_cls(x)
         rpn_bbox_pred = self.rpn_reg(x)
-        rpn_cnt_score = self.rpn_cnt(x)
-        return rpn_cls_score, rpn_bbox_pred, rpn_cnt_score
+        # rpn_cnt_score = self.rpn_cnt(x)
+        return rpn_cls_score, rpn_bbox_pred
 
     def loss(self,
              cls_scores,
              bbox_preds,
-             cnt_scores,
              gt_bboxes,
              img_metas,
              gt_bboxes_ignore=None):
         losses = super(RPNHeadWithCount, self).loss(
             cls_scores,
             bbox_preds,
-            cnt_scores,
             gt_bboxes,
             None,
             None,
             img_metas,
             gt_bboxes_ignore=gt_bboxes_ignore)
         return dict(
-            loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'], loss_rpn_cnt=losses['loss_cnt'])
+            # loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'], loss_rpn_cnt=losses['loss_cnt'])
+            loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'])
 
     def _get_bboxes_single(self,
                            cls_score_list,
                            bbox_pred_list,
-                           cnt_score_list,
                            score_factor_list,
-                           cnt_score_factor_list,
                            mlvl_anchors,
                            img_meta,
                            cfg,
@@ -357,7 +354,7 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
         for level_idx in range(len(cls_score_list)):
             rpn_cls_score = cls_score_list[level_idx]
             rpn_bbox_pred = bbox_pred_list[level_idx]
-            rpn_cnt_score = cnt_score_list[level_idx]
+            # rpn_cnt_score = cnt_score_list[level_idx]
             assert (rpn_cls_score.size()[-2:] == rpn_bbox_pred.size()[-2:])
             # bbox
             rpn_bbox_pred = rpn_bbox_pred.permute(1, 2, 0).reshape(-1, 4)
@@ -369,27 +366,27 @@ class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
             else:
                 rpn_cls_score = rpn_cls_score.reshape(-1, 2)
                 scores = rpn_cls_score.softmax(dim=1)[:, 0]
-            # rpn
-            rpn_cnt_score = rpn_cnt_score.permute(1, 2, 0)
-            if self.use_sigmoid_cnt:
-                rpn_cnt_score = rpn_cnt_score.reshape(-1)
-                cnt_scores = rpn_cnt_score.sigmoid()
-            else:
-                rpn_cnt_score = rpn_cnt_score.reshape(-1, 2)
-                cnt_scores = rpn_cnt_score.softmax(dim=1)[:, 0]
+            # cnt
+            # rpn_cnt_score = rpn_cnt_score.permute(1, 2, 0)
+            # if self.use_sigmoid_cnt:
+            #     rpn_cnt_score = rpn_cnt_score.reshape(-1)
+            #     cnt_scores = rpn_cnt_score.sigmoid()
+            # else:
+            #     rpn_cnt_score = rpn_cnt_score.reshape(-1, 2)
+            #     cnt_scores = rpn_cnt_score.softmax(dim=1)[:, 0]
 
             anchors = mlvl_anchors[level_idx]
             if 0 < nms_pre < scores.shape[0]:
                 ranked_scores, rank_inds = scores.sort(descending=True)
                 topk_inds = rank_inds[:nms_pre]
                 scores = ranked_scores[:nms_pre]
-                cnt_scores = cnt_scores[topk_inds]
+                # cnt_scores = cnt_scores[topk_inds]
                 rpn_bbox_pred = rpn_bbox_pred[topk_inds, :]
                 anchors = anchors[topk_inds, :]
 
             mlvl_scores.append(scores)
             mlvl_bbox_preds.append(rpn_bbox_pred)
-            mlvl_cnt_scores.append(cnt_scores)
+            # mlvl_cnt_scores.append(cnt_scores)
             mlvl_valid_anchors.append(anchors)
             level_ids.append(
                 scores.new_full((scores.size(0), ),
