@@ -791,7 +791,7 @@ class BBoxHeadWithCount(BaseModule):
              bbox_pred,
              cnt_score,
              rois,
-             num_stages,
+             stage,
              labels,
              label_weights,
              bbox_targets,
@@ -804,14 +804,14 @@ class BBoxHeadWithCount(BaseModule):
         learning_cnt_weights=1.0
         learning_cls_weights=1.0
         learning_bbox_weights=1.0
-        if num_stages == 0:
-            counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
+        if stage + 1 == 1:
+            counts = torch.from_numpy(np.array(self.div_stage1(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
             learning_cnt_weights=0.1
             learning_cls_weights=1.0
             learning_bbox_weights=1.0
-        elif num_stages == 1:
-            counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
+        elif stage + 1 == 2:
+            counts = torch.from_numpy(np.array(self.div_stage2(counts))).cuda()
             #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage2(count_weights),np.float32)).cuda()
             learning_cnt_weights=0.1
             learning_cls_weights=0.5

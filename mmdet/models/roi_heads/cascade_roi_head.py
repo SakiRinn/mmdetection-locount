@@ -684,7 +684,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                                                bbox_results['bbox_pred'],
                                                bbox_results['cnt_score'],       # ADD
                                                rois,
-                                               self.num_stages,
+                                               stage,
                                                *bbox_targets)
 
         bbox_results.update(
