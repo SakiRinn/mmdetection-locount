@@ -26,18 +26,22 @@
   ```
 
 ## 模型
-该部分修改主要在`mmdet/models/`下进行。
+### `models/detectors`部分
 * `mmdet/models/detectors/two_stage.py`\
   **基类**。添加`TwoStageDetectorWithCount`类。\
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，具体同上。
+
+### `models/dense_heads`部分
 * `mmdet/models/dense_heads/base_dense_head.py`\
   **基类**。添加`BaseDenseHeadWithCount`类。
 * `mmdet/models/dense_heads/anchor_head.py`\
   添加`AnchorHeadWithCount`类。
 * `mmdet/models/dense_heads/rpn_head.py`\
   添加`RPNHeadWithCount`类。
+
+### `models/roi_heads`部分
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
   **基类**。添加`BBoxHeadWithCount`类。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
@@ -46,7 +50,7 @@
   添加`CascadeRoIHeadWithCount`类。
 
 ## 数据采样
-该部分修改主要在`mmdet/core/`下进行。
+该部分修改主要在`core/`下进行。
 * `mmdet/core/bbox/assigners/base_sampler.py`\
   **基类**。添加`BaseSamplerWithCount`类，添加了`gt_counts`变量。
 * `mmdet/core/bbox/assigners/base_assigner.py`\
@@ -63,6 +67,8 @@
   `bbox2result`函数中添加`counts`参数。
 * `mmdet/core/evaluation/class_names.py`\
   修改`coco_classes`中的类型。
+* `mmdet/datasets/coco.py`\
+  修改`CLASSES`常量和`_parse_ann_info`函数。
 
 ## 配置文件
 该部分修改主要在`configs/`下进行。
