@@ -7,8 +7,6 @@ with contextlib.suppress(Exception):
     import pycocotools.mask as mask
 from mmdet.core.evaluation import coco_classes
 
-CLASSES = tuple(coco_classes())
-
 
 def ann2rle(ann, h, w):
     ''' For mask.
@@ -37,7 +35,7 @@ def rle2area(rle):
 def txt2json(dir, json_path='ann_file'):
     images = []
     annotations = []
-    categories = [{'id': i, 'name': cat} for i, cat in enumerate(CLASSES)]
+    categories = [{'id': i, 'name': cat} for i, cat in enumerate(coco_classes())]
 
     txts = [name for name in os.listdir(dir) if re.match(r'^\d+\.txt$', name) is not None]
     for txt in txts:
@@ -56,16 +54,18 @@ def txt2json(dir, json_path='ann_file'):
                 seg = line.strip().split(",")
                 for dic in categories:
                     if dic['name'] == seg[-2]:
-                        cat_id = dic['id']
+                        cls_id = dic['id']
                         break
+                x1, y1, x2, y2 = [int(n) for n in seg[:4]]
 
                 annotations.append(dict(
                     id=len(annotations),
                     image_id=img_id,
-                    category_id=cat_id,
-                    bbox=[int(n) for n in seg[:4]],
+                    category_id=cls_id,
+                    bbox=[x1, y1, x2-x1, y2-y1],
                     count=int(seg[-1]),
-                    iscrowd=0   # 存疑
+                    area=(x2-x1)*(y2-y1),   # 存疑
+                    iscrowd=0               # 存疑
                 ))
 
     ann_file = dict(images=images, annotations=annotations, categories=categories)
