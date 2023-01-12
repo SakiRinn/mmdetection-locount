@@ -231,20 +231,20 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner, BaseAssignerWithCount):
                  match_low_quality=True,
                  gpu_assign_thr=-1,
                  iou_calculator=dict(type='BboxOverlaps2D')):
-        super().__init__(pos_iou_thr,
-                         neg_iou_thr,
-                         min_pos_iou,
-                         gt_max_assign_all,
-                         ignore_iof_thr,
-                         ignore_wrt_candidates,
-                         match_low_quality,
-                         gpu_assign_thr,
-                         iou_calculator)
+        super(MaxIoUAssignerWithCount, self).__init__(
+            pos_iou_thr,
+            neg_iou_thr,
+            min_pos_iou,
+            gt_max_assign_all,
+            ignore_iof_thr,
+            ignore_wrt_candidates,
+            match_low_quality,
+            gpu_assign_thr,
+            iou_calculator)
 
     def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None, gt_counts=None):
         assign_on_cpu = True if (self.gpu_assign_thr > 0) and (
             gt_bboxes.shape[0] > self.gpu_assign_thr) else False
-        # compute overlap and assign gt on CPU when number of GT is large
         if assign_on_cpu:
             device = bboxes.device
             bboxes = bboxes.cpu()
@@ -282,16 +282,13 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner, BaseAssignerWithCount):
     def assign_wrt_overlaps(self, overlaps, gt_labels=None, gt_counts=None):
         num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
 
-        # 1. assign -1 by default
         assigned_gt_inds = overlaps.new_full((num_bboxes, ),
                                              -1,
                                              dtype=torch.long)
 
         if num_gts == 0 or num_bboxes == 0:
-            # No ground truth or boxes, return empty assignment
             max_overlaps = overlaps.new_zeros((num_bboxes, ))
             if num_gts == 0:
-                # No truth, assign everything to background
                 assigned_gt_inds[:] = 0
             if gt_labels is None:
                 assigned_labels = None
@@ -312,15 +309,9 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner, BaseAssignerWithCount):
                 labels=assigned_labels,
                 counts=assigned_counts)
 
-        # for each anchor, which gt best overlaps with it
-        # for each anchor, the max iou of all gts
         max_overlaps, argmax_overlaps = overlaps.max(dim=0)
-        # for each gt, which anchor best overlaps with it
-        # for each gt, the max iou of all proposals
         gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
 
-        # 2. assign negative: below
-        # the negative inds are set to be 0
         if isinstance(self.neg_iou_thr, float):
             assigned_gt_inds[(max_overlaps >= 0)
                              & (max_overlaps < self.neg_iou_thr)] = 0
@@ -329,7 +320,6 @@ class MaxIoUAssignerWithCount(MaxIoUAssigner, BaseAssignerWithCount):
             assigned_gt_inds[(max_overlaps >= self.neg_iou_thr[0])
                              & (max_overlaps < self.neg_iou_thr[1])] = 0
 
-        # 3. assign positive: above positive IoU threshold
         pos_inds = max_overlaps >= self.pos_iou_thr
         assigned_gt_inds[pos_inds] = argmax_overlaps[pos_inds] + 1
 

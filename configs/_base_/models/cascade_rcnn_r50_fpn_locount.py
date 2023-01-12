@@ -30,8 +30,13 @@ model = dict(
             target_means=[.0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0]),
         loss_cls=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_bbox=dict(type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0)),
+            type='CrossEntropyLoss',
+            use_sigmoid=True,
+            loss_weight=1.0),
+        loss_bbox=dict(
+            type='SmoothL1Loss',
+            beta=1.0 / 9.0,
+            loss_weight=1.0)),
     roi_head=dict(
         type='CascadeRoIHeadWithCount',
         num_stages=3,
@@ -206,7 +211,8 @@ model = dict(
                     add_gt_as_proposals=True),
                 pos_weight=-1,
                 debug=False)
-        ], stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters   2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]  mmdet/models/detectors/cascade rcnn),
+        ],
+        stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters   2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]  mmdet/models/detectors/cascade rcnn),
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,

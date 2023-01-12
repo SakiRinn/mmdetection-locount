@@ -1,20 +1,16 @@
 # 工作表
+
 ## 数据集
 该部分修改主要在`mmdet/datasets/`下进行。
-* `tools/misc/locount_txt2json.py`\
-  将原为`.txt`格式的annotations转化为单个`.json`文件。
+全部已完工，可复用。
+
+### `datasets/pipelines`部分
 * `mmdet/datasets/pipelines/loading.py`\
   主要修改`LoadAnnotations`类。\
   添加`with_count`参数，并实现了`_load_count`函数。
 * `mmdet/datasets/pipelines/formatting.py`\
   主要修改`ToDataContainer`类。\
   修改`__init__`函数中`field`参数的默认值，添加了`gt_counts`键。
-* `mmdet/datasets/coco.py`\
-  检测条件修改，删除了`area`键的检测。
-  ```Python
-  # if ann['area'] <= 0 or w < 1 or h < 1:
-  if w < 1 or h < 1:
-  ```
 * `mmdet/datasets/pipelines/formatting.py`\
   将`gt_counts`加入至使用`DataContainer`嵌套的标签。
   ```Python
@@ -25,19 +21,36 @@
       results[key] = DC(to_tensor(results[key]))
   ```
 
+### 其它
+* `tools/misc/locount_txt2json.py`\
+  **新文件**。将原为`.txt`格式的annotations转化为单个`.json`文件。
+
+
 ## 模型
-该部分修改主要在`mmdet/models/`下进行。
+该部分修改主要在`mmdet/model/`下进行。
+
+### `models/detectors`部分
+仅基类可复用。
 * `mmdet/models/detectors/two_stage.py`\
   **基类**。添加`TwoStageDetectorWithCount`类。\
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，具体同上。
+
+### `models/dense_heads`部分
+已完工，可复用，基本无修改。
 * `mmdet/models/dense_heads/base_dense_head.py`\
-  **基类**。添加`BaseDenseHeadWithCount`类。
+  **基类**。添加`BaseDenseHeadWithCount`类。\
+  其实什么都没改，也根本不用改。
 * `mmdet/models/dense_heads/anchor_head.py`\
   添加`AnchorHeadWithCount`类。
+  仅修改了部分函数的输入参数，核心部分未修改（无需添加cnt）。
 * `mmdet/models/dense_heads/rpn_head.py`\
-  添加`RPNHeadWithCount`类。
+  添加`RPNHeadWithCount`类。\
+  基本无修改，仅指定了`loss`函数的`gt_count=None`.
+
+### `models/roi_heads`部分
+仅基类可复用。
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
   **基类**。添加`BBoxHeadWithCount`类。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
@@ -45,24 +58,36 @@
 * `mmdet/models/roi_heads/cascade_roi_head.py`\
   添加`CascadeRoIHeadWithCount`类。
 
+
 ## 数据采样
 该部分修改主要在`mmdet/core/`下进行。
-* `mmdet/core/bbox/assigners/base_sampler.py`\
-  **基类**。添加`BaseSamplerWithCount`类，添加了`gt_counts`变量。
+全部已完工，可复用。
+
+### `core/assigners`部分
+用于指定正负样本。
 * `mmdet/core/bbox/assigners/base_assigner.py`\
   **基类**。添加`BaseAssignerWithCount`类，添加了`gt_counts`变量。
-* `mmdet/core/bbox/samplers/random_sampler.py`\
-  添加`RandomSamplerWithCount`类。
-* `mmdet/core/bbox/samplers/sampling_result.py`\
-  添加`SamplingResultWithCount`类。
 * `mmdet/core/bbox/assigners/max_iou_assigner.py`\
   添加`MaxIoUAssignerWithCount`类。
 * `mmdet/core/bbox/assigners/assign_result.py`\
   添加`AssignResultWithCount`类。
+
+### `core/samplers`部分
+用于指定后对样本采样。
+* `mmdet/core/bbox/assigners/base_sampler.py`\
+  **基类**。添加`BaseSamplerWithCount`类，添加了`gt_counts`变量。
+* `mmdet/core/bbox/samplers/random_sampler.py`\
+  添加`RandomSamplerWithCount`类。
+* `mmdet/core/bbox/samplers/sampling_result.py`\
+  添加`SamplingResultWithCount`类。
+
+### 其它
 * `mmdet/core/bbox/transforms.py`\
   `bbox2result`函数中添加`counts`参数。
 * `mmdet/core/evaluation/class_names.py`\
   修改`coco_classes`中的类型。
+* `mmdet/datasets/coco.py`\
+  修改`CLASSES`常量与`coco_classes`一致，以及`_parse_ann_info`函数。
 
 ## 配置文件
 该部分修改主要在`configs/`下进行。

@@ -155,8 +155,7 @@ class SamplingResult(util_mixins.NiceRepr):
 
 class SamplingResultWithCount(SamplingResult):
 
-    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
-                 gt_flags, gt_counts):
+    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result, gt_flags):
         super(SamplingResultWithCount, self).__init__(pos_inds, neg_inds,
                                                       bboxes, gt_bboxes, assign_result, gt_flags)
 
@@ -185,3 +184,50 @@ class SamplingResultWithCount(SamplingResult):
             'pos_gt_counts': self.pos_gt_counts,
             'neg_gt_counts': self.neg_gt_counts,
         }
+
+    @classmethod
+    def random(cls, rng=None, **kwargs):
+        from mmdet.core.bbox import demodata
+        from mmdet.core.bbox.assigners.assign_result import AssignResultWithCount
+        from mmdet.core.bbox.samplers.random_sampler import RandomSamplerWithCount
+        rng = demodata.ensure_rng(rng)
+
+        num = 32
+        pos_fraction = 0.5
+        neg_pos_ub = -1
+
+        assign_result = AssignResultWithCount.random(rng=rng, **kwargs)
+
+        bboxes = demodata.random_boxes(assign_result.num_preds, rng=rng)
+        gt_bboxes = demodata.random_boxes(assign_result.num_gts, rng=rng)
+
+        if rng.rand() > 0.2:
+            gt_bboxes = gt_bboxes.squeeze()
+            bboxes = bboxes.squeeze()
+
+        if assign_result.labels is None:
+            gt_labels = None
+        else:
+            gt_labels = None  # todo
+        if assign_result.counts is None:
+            gt_counts = None
+        else:
+            gt_counts = None
+
+        if gt_labels is None:
+            add_gt_as_proposals = False
+        else:
+            add_gt_as_proposals = True  # make probabilistic?
+        if gt_counts is None:
+            add_gt_as_proposals = False
+        else:
+            add_gt_as_proposals = True
+
+        sampler = RandomSamplerWithCount(
+            num,
+            pos_fraction,
+            neg_pos_ub=neg_pos_ub,
+            add_gt_as_proposals=add_gt_as_proposals,
+            rng=rng)
+        self = sampler.sample(assign_result, bboxes, gt_bboxes, gt_labels, gt_counts)
+        return self

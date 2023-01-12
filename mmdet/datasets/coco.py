@@ -14,6 +14,7 @@ from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
+from mmdet.core.evaluation import coco_classes
 from .api_wrappers import COCO, COCOeval
 from .builder import DATASETS
 from .custom import CustomDataset
@@ -22,172 +23,7 @@ from .custom import CustomDataset
 @DATASETS.register_module()
 class CocoDataset(CustomDataset):
 
-    # 20220328：total 140 classes
-    CLASSES = ("Baby diapers",
-               "Baby Furniture",
-               "Baby washing and nursing supplie",
-               "Baby slippers",
-               "Baby handkerchiefs ",
-               "Baby crib",
-               "Baby carriage",
-               "Baby tableware",
-               "Dairy",
-               "Cocktail",
-               "Red wine",
-               "Liquor and Spirits",
-               "Carbonated drinks",
-               "Herbal tea",
-               "Coffee",
-               "Tea beverage",
-               "Baby milk powder",
-               "Guozhen",
-               "Ginger Tea",             # DeleteClass 20191102
-               "Sour Plum Soup",            # DeleteClass 20191102  20
-               "Adult milk powder",
-               "Tea",
-               "Notebook",
-               "Pencil case",
-               "Pen",
-               "Baby Toys",
-               "Children Toys",
-               "Football",
-               "Rubber ball",           # DeleteClass 20191103
-               "Badminton",
-               "Basketball",
-               "Skate",
-               "Pasta",
-               "Noodle",
-               "Flour",
-               "Rise",
-               "Oats",
-               "Sesame paste",
-               "Soymilk",
-               "Lotus root flour",          # DeleteClass 20191103
-               "Walnut powder",
-               "Quick-frozen Tangyuan",
-               "Quick-frozen Wonton",
-               "Quick-frozen dumplings",
-               "Can",
-               "Instant noodles",
-               "Mixed congee",
-               "Potato chips",
-               "Dried meat",
-               #"Chicken claws",             # DeleteClass 20191103           20200114Del
-               "Hot strips",             # DeleteClass 20191103
-               "Dried fish",             # DeleteClass 20191103
-               "Dried beans",             # DeleteClass 20191103
-               "Fish tofu",             # DeleteClass 20191103
-               "Chocolates",
-               "Chewing gum",
-               "Cake",
-               "Pie",
-               "Biscuits",
-               # "Potatoes",    # DeleteClass 20191102           20200114Del
-               "Ice cream",
-               "Cooking wine",
-               "Soy sauce",
-               "Sauce",
-               "Vinegar",
-               "Care Kit",
-               "Shampoo",
-               "Hair conditioner",
-               "Hair gel",
-               "Hair dye",
-               "Comb",
-               "Tampon",
-               "Cotton swab",
-               "Band aid",
-               "Adult Diapers",
-               "Bath lotion",
-               "Soap",                 # DeleteClass 20191102
-               # "Flower dew",           # DeleteClass 20191102  10       20200114Del
-               "Emulsion",
-               "Facial Cleanser",
-               "Razor",
-               "Facial mask",
-               "Skin care set",
-               "Toothbrush",
-               # "Dental floss bar",        # DeleteClass 20191102       20200114Del
-               "Toothpaste",
-               "Mouth wash",
-               "Makeup tools",
-               "Jacket",
-               "Trousers",
-               "Adult shoes",
-               "Adult socks",
-               "Children shoes",
-               "Children Socks",
-               "Children hats",
-               "Children underwear",             # DeleteClass 20191103
-               "Lingerie",
-               "Men underwear",
-               "Adult hat",
-               "Bedding set",
-               "Juicer",
-               "Washing machine",
-               "Microwave Oven",
-               "Desk lamp",
-               "Air conditioning fan",
-               "Air conditioner",
-               "Soybean Milk machine",
-               "Electric iron",
-               "Electric kettle",
-               # "Pressure cooker",            # DeleteClass 20191102       20200114Del
-               "Television",
-               "Electric Hot pot",
-               "Electric fan",
-               "Rice cooker",
-               "Electromagnetic furnace",
-               "Electric frying pan",
-               "Electric steaming pan",             # DeleteClass 20191103
-               "Hair drier",
-               "Socket",
-               "Refrigerator",
-               "Coat hanger",
-               "Sports cup",
-               "Disposable cups",
-               "Thermos bottle",
-               "Basin",
-               "Mug",
-               "Draw bar box",
-               "Trash",
-               "Disposable bag",
-               "Storage box",
-               "Storage bottle",
-               "Stool",     # NewClass20191010
-               # "Package",     # DeleteClass 20191102       20200114Del
-               "Knapsack",
-               "Chopping block",
-               "Food box",
-               "Spoon",             # DeleteClass 20191103
-               "Chopsticks",
-               "Bowl",     # NewClass20191010
-               "Pot shovel",
-               "Soup ladle",
-               "Cutter",             # DeleteClass 20191103
-               # "Oil brush", #DeleteClass20191027
-               "Knives",       # DeleteClass 20191102
-               "Forks",
-               "Dinner plate",
-               "Fresh-keeping film"
-               # "Fresh-keeping bag"   # DeleteClass 20191102               20200114Del
-               )
-
-#     CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-#                'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
-#                'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-#                'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-#                'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-#                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-#                'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-#                'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-#                'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-#                'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-#                'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-#                'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
-#                'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-#                'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
-
+    CLASSES = tuple(coco_classes())
 #     PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
 #                (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
 #                (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
@@ -219,7 +55,6 @@ class CocoDataset(CustomDataset):
         Returns:
             list[dict]: Annotation info from COCO api.
         """
-
         self.coco = COCO(ann_file)
         # The order of returned `cat_ids` will not
         # change with the order of the CLASSES
@@ -318,8 +153,7 @@ class CocoDataset(CustomDataset):
             inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
             if inter_w * inter_h == 0:
                 continue
-            # if ann['area'] <= 0 or w < 1 or h < 1:
-            if w < 1 or h < 1:
+            if ann['area'] <= 0 or w < 1 or h < 1:
                 continue
             if ann['category_id'] not in self.cat_ids:
                 continue
