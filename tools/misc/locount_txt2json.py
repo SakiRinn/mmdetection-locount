@@ -64,8 +64,8 @@ def txt2json(dir, json_path='ann_file'):
                     category_id=cls_id,
                     bbox=[x1, y1, x2-x1, y2-y1],
                     count=int(seg[-1]),
-                    area=(x2-x1)*(y2-y1),   # 存疑
-                    iscrowd=0               # 存疑
+                    area=float((x2-x1)*(y2-y1)),    # 存疑
+                    iscrowd=0                       # 存疑
                 ))
 
     ann_file = dict(images=images, annotations=annotations, categories=categories)
