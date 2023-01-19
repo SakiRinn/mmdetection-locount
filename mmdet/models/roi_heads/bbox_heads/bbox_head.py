@@ -11,6 +11,7 @@ from mmdet.models.losses import accuracy
 from mmdet.models.utils import build_linear_layer
 
 import numpy as np
+import math
 
 
 @HEADS.register_module()
@@ -911,6 +912,7 @@ class BBoxHeadWithCount(BaseModule):
             bboxes = (bboxes.view(bboxes.size(0), -1, 4) / scale_factor).view(
                 bboxes.size()[0], -1)
 
+        # Determine the counts for all bboxes.
         if isinstance(cnt_score, list):
             cnt_score = sum(cnt_score) / float(len(cnt_score))
         count = F.softmax(cnt_score, dim=-1) if cnt_score is not None else None
@@ -1200,3 +1202,19 @@ class BBoxHeadWithCount(BaseModule):
             return 1
         valB = ''.join('0' if e < 0.5 else '1' for e in bins)
         return int(valB, 2)
+
+    def div_count(self, counts, stage, num_stages=3):
+        assert stage < num_stages
+        if not isinstance(counts, torch.Tensor):
+            counts = torch.tensor(counts)
+
+        num_digits = math.ceil(math.log(self.num_counts))
+        coarse_digits = (num_digits // num_stages) + 1 if (num_digits % num_stages != 0) \
+                        else (num_digits // num_stages)
+        coarse_counts = (num_digits % num_stages) if (stage == 0 and num_digits % num_stages != 0) \
+                        else 2**coarse_digits
+
+        lower = coarse_counts << (num_stages - stage - 1)
+        upper = (coarse_counts << (num_stages - stage)) - 1
+        valid_mask = torch.logical_and(lower < counts, counts < upper)
+        return valid_mask.to(torch.float32)     # 二分类

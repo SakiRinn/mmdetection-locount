@@ -549,7 +549,7 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
 
 
 @HEADS.register_module()
-class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
+class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
 
     def __init__(self,
                  num_classes,
@@ -581,7 +581,7 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
                      type='Normal',
                      layer='Conv2d',
                      std=0.01)):
-        super(AnchorHead, self).__init__(init_cfg)
+        super(AnchorHeadWithCount, self).__init__(init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.num_counts = num_counts
@@ -637,37 +637,6 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
 
         self.num_base_priors = self.prior_generator.num_base_priors[0]
         self._init_layers()
-
-    def _init_layers(self):
-        self.conv_cls = nn.Conv2d(self.in_channels,
-                                  self.num_base_priors * self.cls_out_channels,
-                                  1)
-        self.conv_reg = nn.Conv2d(self.in_channels, self.num_base_priors * 4,
-                                  1)
-        # self.conv_cnt = nn.Conv2d(self.in_channels,
-        #                           self.cnt_out_channels,
-        #                           1)
-
-    def forward_single(self, x):
-        """Forward feature of a single scale level.
-
-        Args:
-            x (Tensor): Features of a single scale level.
-
-        Returns:
-            tuple:
-                cls_score (Tensor): Cls scores for a single scale level \
-                    the channels number is num_base_priors * num_classes.
-                bbox_pred (Tensor): Box energies / deltas for a single scale \
-                    level, the channels number is num_base_priors * 4.
-        """
-        cls_score = self.conv_cls(x)
-        bbox_pred = self.conv_reg(x)
-        # cnt_score = self.conv_cnt(x)
-        return cls_score, bbox_pred
-
-    def forward(self, feats):
-        return multi_apply(self.forward_single, feats)
 
     def _get_targets_single(self,
                             flat_anchors,
@@ -823,35 +792,6 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
 
         return res + tuple(rest_results)
 
-    def loss_single(self, cls_score, bbox_pred, anchors,
-                    labels, label_weights, bbox_targets, bbox_weights, counts, count_weights,
-                    num_total_samples):
-        labels = labels.reshape(-1)
-        label_weights = label_weights.reshape(-1)
-        # counts = counts.reshape(-1)
-        # count_weights = count_weights.reshape(-1)
-        cls_score = cls_score.permute(0, 2, 3,
-                                      1).reshape(-1, self.cls_out_channels)
-        loss_cls = self.loss_cls(
-            cls_score, labels, label_weights, avg_factor=num_total_samples)
-        # cnt_score = cnt_score.permute(0, 2, 3,
-        #                               1).reshape(-1, self.cnt_out_channels)
-        # loss_cnt = self.loss_cnt(
-        #     cnt_score, counts, count_weights, avg_factor=num_total_samples)
-
-        bbox_targets = bbox_targets.reshape(-1, 4)
-        bbox_weights = bbox_weights.reshape(-1, 4)
-        bbox_pred = bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
-        if self.reg_decoded_bbox:
-            anchors = anchors.reshape(-1, 4)
-            bbox_pred = self.bbox_coder.decode(anchors, bbox_pred)
-        loss_bbox = self.loss_bbox(
-            bbox_pred,
-            bbox_targets,
-            bbox_weights,
-            avg_factor=num_total_samples)
-        return loss_cls, loss_bbox
-
     @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def loss(self,
              cls_scores,
@@ -879,8 +819,7 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
             gt_labels_list=gt_labels,
             gt_counts_list=gt_counts,
             label_channels=label_channels,
-            # count_channels=count_channels)
-            count_channels=self.num_counts)
+            count_channels=self.num_counts)     # count_channels?
         if cls_reg_cnt_targets is None:
             return None
 
@@ -905,8 +844,5 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
             label_weights_list,
             bbox_targets_list,
             bbox_weights_list,
-            counts_list,
-            count_weights_list,
             num_total_samples=num_total_samples)
-        # return dict(loss_cls=losses_cls, loss_bbox=losses_bbox, loss_cnt=losses_cnt)
         return dict(loss_cls=losses_cls, loss_bbox=losses_bbox)
