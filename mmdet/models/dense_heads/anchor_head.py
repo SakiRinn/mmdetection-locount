@@ -549,7 +549,7 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
 
 
 @HEADS.register_module()
-class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
+class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
 
     def __init__(self,
                  num_classes,
@@ -581,7 +581,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
                      type='Normal',
                      layer='Conv2d',
                      std=0.01)):
-        super(AnchorHeadWithCount, self).__init__(init_cfg)
+        super(AnchorHead, self).__init__(init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.num_counts = num_counts
