@@ -106,7 +106,7 @@ class RandomSamplerWithCount(BaseSamplerWithCount):
                gt_labels,
                gt_counts,
                **kwargs):
-        super(RandomSamplerWithCount, self).sample(
+        return super(RandomSamplerWithCount, self).sample(
             assign_result,
             bboxes,
             gt_bboxes,
