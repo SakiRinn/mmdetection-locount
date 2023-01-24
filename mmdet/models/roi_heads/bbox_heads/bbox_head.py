@@ -598,9 +598,10 @@ class BBoxHead(BaseModule):
 
 
 @HEADS.register_module()
-class BBoxHeadWithCount(BaseModule):
+class BBoxHeadWithCount(BBoxHead):
 
     def __init__(self,
+                 num_stages=0,
                  with_avg_pool=False,
                  with_cls=True,
                  with_reg=True,
@@ -632,8 +633,9 @@ class BBoxHeadWithCount(BaseModule):
                      use_sigmoid=False,
                      loss_weight=1.0),                              # ADD
                  init_cfg=None):
-        super(BBoxHeadWithCount, self).__init__(init_cfg)
+        super(BBoxHead, self).__init__(init_cfg)
         assert with_cls or with_reg or with_cnt
+        self.num_stages = num_stages
         self.with_avg_pool = with_avg_pool
         self.with_cls = with_cls
         self.with_reg = with_reg
@@ -698,16 +700,16 @@ class BBoxHeadWithCount(BaseModule):
                 ]
 
     @property
-    def custom_cls_channels(self):
-        return getattr(self.loss_cls, 'custom_cls_channels', False)
+    def custom_cnt_channels(self):
+        return getattr(self.loss_cnt, 'custom_cnt_channels', False)
 
     @property
-    def custom_activation(self):
-        return getattr(self.loss_cls, 'custom_activation', False)
+    def custom_cnt_activation(self):
+        return getattr(self.loss_cnt, 'custom_activation', False)
 
     @property
-    def custom_accuracy(self):
-        return getattr(self.loss_cls, 'custom_accuracy', False)
+    def custom_cnt_accuracy(self):
+        return getattr(self.loss_cnt, 'custom_accuracy', False)
 
     @auto_fp16()
     def forward(self, x):
@@ -802,28 +804,37 @@ class BBoxHeadWithCount(BaseModule):
              reduction_override=None):
         losses = dict()
 
-        learning_cnt_weights=1.0
-        learning_cls_weights=1.0
-        learning_bbox_weights=1.0
-        if stage + 1 == 1:
-            counts = torch.from_numpy(np.array(self.div_stage1(counts))).cuda()
-            #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
-            learning_cnt_weights=0.1
-            learning_cls_weights=1.0
-            learning_bbox_weights=1.0
-        elif stage + 1 == 2:
-            counts = torch.from_numpy(np.array(self.div_stage2(counts))).cuda()
-            #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage2(count_weights),np.float32)).cuda()
-            learning_cnt_weights=0.1
-            learning_cls_weights=0.5
-            learning_bbox_weights=0.5
-        else:
-            counts = torch.from_numpy(np.array(self.div_stage3(counts))).cuda()
-            #count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage3(count_weights),np.float32)).cuda()
-            learning_cnt_weights=0.1
-            learning_cls_weights=0.25
-            learning_bbox_weights=0.25
+        learning_bbox_weights = 1.0 * pow(2, -stage)
+        learning_cls_weights  = 1.0 * pow(2, -stage)
+        learning_cnt_weights  = pow(2, 2 - self.num_stages)
+        counts = self.div_counts(counts, stage)
+        # counts = torch.from_numpy(np.array(self.div_stage1(counts))).cuda()
+        # count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
 
+        # bbox
+        if bbox_pred is not None:
+            bg_class_ind = self.num_classes
+            pos_inds = (labels >= 0) & (labels < bg_class_ind)
+            if pos_inds.any():
+                if self.reg_decoded_bbox:
+                    bbox_pred = self.bbox_coder.decode(rois[:, 1:], bbox_pred)
+                if self.reg_class_agnostic:
+                    pos_bbox_pred = bbox_pred.view(
+                        bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
+                else:
+                    pos_bbox_pred = bbox_pred.view(
+                        bbox_pred.size(0), -1,
+                        4)[pos_inds.type(torch.bool),
+                           labels[pos_inds.type(torch.bool)]]
+                losses['loss_bbox'] = learning_bbox_weights * self.loss_bbox(
+                    pos_bbox_pred,
+                    bbox_targets[pos_inds.type(torch.bool)],
+                    bbox_weights[pos_inds.type(torch.bool)],
+                    avg_factor=bbox_targets.size(0),
+                    reduction_override=reduction_override)
+            else:
+                losses['loss_bbox'] = bbox_pred[pos_inds].sum()
+        # cls
         if cls_score is not None:
             avg_factor = max(torch.sum(label_weights > 0).float().item(), 1.)
             if cls_score.numel() > 0:
@@ -842,43 +853,25 @@ class BBoxHeadWithCount(BaseModule):
                     losses.update(acc_)
                 else:
                     losses['acc'] = accuracy(cls_score, labels)
-        if bbox_pred is not None:
-            bg_class_ind = self.num_classes
-            # 0~self.num_classes-1 are FG, self.num_classes is BG
-            pos_inds = (labels >= 0) & (labels < bg_class_ind)
-            # do not perform bounding box regression for BG anymore.
-            if pos_inds.any():
-                if self.reg_decoded_bbox:
-                    # When the regression loss (e.g. `IouLoss`,
-                    # `GIouLoss`, `DIouLoss`) is applied directly on
-                    # the decoded bounding boxes, it decodes the
-                    # already encoded coordinates to absolute format.
-                    bbox_pred = self.bbox_coder.decode(rois[:, 1:], bbox_pred)
-                if self.reg_class_agnostic:
-                    pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
-                else:
-                    pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), -1,
-                        4)[pos_inds.type(torch.bool),
-                           labels[pos_inds.type(torch.bool)]]
-                losses['loss_bbox'] = learning_bbox_weights * self.loss_bbox(
-                    pos_bbox_pred,
-                    bbox_targets[pos_inds.type(torch.bool)],
-                    bbox_weights[pos_inds.type(torch.bool)],
-                    avg_factor=bbox_targets.size(0),
-                    reduction_override=reduction_override)
-            else:
-                losses['loss_bbox'] = bbox_pred[pos_inds].sum()
+        # cnt
         if cnt_score is not None:
-            avg_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
-            losses['loss_cnt'] = learning_cnt_weights * self.loss_cnt(
-                cnt_score,
-                counts,
-                count_weights,
-                avg_factor=avg_factor,
-                reduction_override=reduction_override)
-            losses['acc_cnt'] = accuracy(cnt_score, counts)
+            avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
+            if cnt_score.numel() > 0:
+                loss_cnt_ = learning_cnt_weights * self.loss_cnt(
+                    cnt_score,
+                    counts,
+                    count_weights,
+                    avg_factor=avg_cnt_factor,
+                    reduction_override=reduction_override)
+                if isinstance(loss_cnt_, dict):
+                    losses.update(loss_cnt_)
+                else:
+                    losses['loss_cnt'] = loss_cnt_
+                if self.custom_cnt_activation:
+                    acc_cnt_ = self.loss_cnt.get_accuracy(cnt_score, counts)
+                    losses.update(acc_cnt_)
+                else:
+                    losses['acc_cnt'] = accuracy(cnt_score, counts)
 
         return losses
 
@@ -928,125 +921,6 @@ class BBoxHeadWithCount(BaseModule):
             det_counts = count.expand(det_bboxes.size(0))
             return det_bboxes, det_labels, det_counts
 
-    @force_fp32(apply_to=('bbox_preds', ))
-    def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):
-        """Refine bboxes during training.
-
-        Args:
-            rois (Tensor): Shape (n*bs, 5), where n is image number per GPU,
-                and bs is the sampled RoIs per image. The first column is
-                the image id and the next 4 columns are x1, y1, x2, y2.
-            labels (Tensor): Shape (n*bs, ).
-            bbox_preds (Tensor): Shape (n*bs, 4) or (n*bs, 4*#class).
-            pos_is_gts (list[Tensor]): Flags indicating if each positive bbox
-                is a gt bbox.
-            img_metas (list[dict]): Meta info of each image.
-
-        Returns:
-            list[Tensor]: Refined bboxes of each image in a mini-batch.
-
-        Example:
-            >>> # xdoctest: +REQUIRES(module:kwarray)
-            >>> import kwarray
-            >>> import numpy as np
-            >>> from mmdet.core.bbox.demodata import random_boxes
-            >>> self = BBoxHead(reg_class_agnostic=True)
-            >>> n_roi = 2
-            >>> n_img = 4
-            >>> scale = 512
-            >>> rng = np.random.RandomState(0)
-            >>> img_metas = [{'img_shape': (scale, scale)}
-            ...              for _ in range(n_img)]
-            >>> # Create rois in the expected format
-            >>> roi_boxes = random_boxes(n_roi, scale=scale, rng=rng)
-            >>> img_ids = torch.randint(0, n_img, (n_roi,))
-            >>> img_ids = img_ids.float()
-            >>> rois = torch.cat([img_ids[:, None], roi_boxes], dim=1)
-            >>> # Create other args
-            >>> labels = torch.randint(0, 2, (n_roi,)).long()
-            >>> bbox_preds = random_boxes(n_roi, scale=scale, rng=rng)
-            >>> # For each image, pretend random positive boxes are gts
-            >>> is_label_pos = (labels.numpy() > 0).astype(np.int)
-            >>> lbl_per_img = kwarray.group_items(is_label_pos,
-            ...                                   img_ids.numpy())
-            >>> pos_per_img = [sum(lbl_per_img.get(gid, []))
-            ...                for gid in range(n_img)]
-            >>> pos_is_gts = [
-            >>>     torch.randint(0, 2, (npos,)).byte().sort(
-            >>>         descending=True)[0]
-            >>>     for npos in pos_per_img
-            >>> ]
-            >>> bboxes_list = self.refine_bboxes(rois, labels, bbox_preds,
-            >>>                    pos_is_gts, img_metas)
-            >>> print(bboxes_list)
-        """
-        img_ids = rois[:, 0].long().unique(sorted=True)
-        assert img_ids.numel() <= len(img_metas)
-
-        bboxes_list = []
-        for i in range(len(img_metas)):
-            inds = torch.nonzero(
-                rois[:, 0] == i, as_tuple=False).squeeze(dim=1)
-            num_rois = inds.numel()
-
-            bboxes_ = rois[inds, 1:]
-            label_ = labels[inds]
-            bbox_pred_ = bbox_preds[inds]
-            img_meta_ = img_metas[i]
-            pos_is_gts_ = pos_is_gts[i]
-
-            bboxes = self.regress_by_class(bboxes_, label_, bbox_pred_,
-                                           img_meta_)
-
-            # filter gt bboxes
-            pos_keep = 1 - pos_is_gts_
-            keep_inds = pos_is_gts_.new_ones(num_rois)
-            keep_inds[:len(pos_is_gts_)] = pos_keep
-
-            bboxes_list.append(bboxes[keep_inds.type(torch.bool)])
-
-        return bboxes_list
-
-    @force_fp32(apply_to=('bbox_pred', ))
-    def regress_by_class(self, rois, label, bbox_pred, img_meta):
-        """Regress the bbox for the predicted class. Used in Cascade R-CNN.
-
-        Args:
-            rois (Tensor): Rois from `rpn_head` or last stage
-                `bbox_head`, has shape (num_proposals, 4) or
-                (num_proposals, 5).
-            label (Tensor): Only used when `self.reg_class_agnostic`
-                is False, has shape (num_proposals, ).
-            bbox_pred (Tensor): Regression prediction of
-                current stage `bbox_head`. When `self.reg_class_agnostic`
-                is False, it has shape (n, num_classes * 4), otherwise
-                it has shape (n, 4).
-            img_meta (dict): Image meta info.
-
-        Returns:
-            Tensor: Regressed bboxes, the same shape as input rois.
-        """
-
-        assert rois.size(1) == 4 or rois.size(1) == 5, repr(rois.shape)
-
-        if not self.reg_class_agnostic:
-            label = label * 4
-            inds = torch.stack((label, label + 1, label + 2, label + 3), 1)
-            bbox_pred = torch.gather(bbox_pred, 1, inds)
-        assert bbox_pred.size(1) == 4
-
-        max_shape = img_meta['img_shape']
-
-        if rois.size(1) == 4:
-            new_rois = self.bbox_coder.decode(
-                rois, bbox_pred, max_shape=max_shape)
-        else:
-            bboxes = self.bbox_coder.decode(
-                rois[:, 1:], bbox_pred, max_shape=max_shape)
-            new_rois = torch.cat((rois[:, [0]], bboxes), dim=1)
-
-        return new_rois
-
     def init_weights(self):
         if self.with_cls:
             nn.init.normal_(self.fc_cls.weight, 0, 0.01)
@@ -1058,163 +932,16 @@ class BBoxHeadWithCount(BaseModule):
             nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
             nn.init.constant_(self.fc_cnt.bias, 0)
 
-    def div_stage1(self, counts):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = counts.cpu().numpy()
-        # Counts_np = Counts.cpu().numpy()
-        gtCountDivs = counts.copy()
-        # print(Counts_np.shape, Counts_np[0], Counts_np[0].shape)
-        for idx, count in enumerate(counts):
-            #if count ==0:
-            #    GtCountsDiv_list[idx] = 0
-            if 0<=count<5:
-                gtCountDivs[idx] = 1-1
-            elif 5<=count<11:
-                gtCountDivs[idx] = 2-1
-            elif 11<=count<16:
-                gtCountDivs[idx] = 3-1
-            elif 16<=count<21:
-                gtCountDivs[idx] = 4-1
-            elif 21<=count<26:
-                gtCountDivs[idx] = 5-1
-            elif 26<=count<31:
-                gtCountDivs[idx] = 6-1
-            elif 31<=count<36:
-                gtCountDivs[idx] = 7-1
-            elif 36<=count<41:
-                gtCountDivs[idx] = 8-1
-            elif 41<=count<46:
-                gtCountDivs[idx] = 9-1
-            elif 46<=count<100:
-                gtCountDivs[idx] = 10-1
-
-        #GtCountBins_list = []
-        #GtCountOneHot_list = [0,0,0,0]
-        #for Val in GtCountsDiv_list:
-        #    GtCountOneHot_list[Val-1]=1
-        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
-
-        return gtCountDivs #GtCountBins_list
-
-    def div_stage2(self, counts):
-        ''' Stage1: Divide the range into 6 parts. '''
-        # Counts_np = np.array(torch.tensor(Counts, device='cpu'))
-        counts = counts.cpu().numpy()
-        gtCountDivs = counts.copy()
-        for idx, count in enumerate(counts):
-            #if count ==0:
-            #    GtCountsDiv_list[idx] = 0
-            if 0<=count<= 3:
-                gtCountDivs[idx] = 1-1
-            elif 4<=count<= 7:
-                gtCountDivs[idx] = 2-1
-            elif 8<=count<= 11:
-                gtCountDivs[idx] = 3-1
-            elif 12<=count<= 15:
-                gtCountDivs[idx] = 4-1
-            elif 16<=count<= 19:
-                gtCountDivs[idx] = 5-1
-            elif 20 <=count <=23:
-                gtCountDivs[idx] = 6-1
-            elif 24 <=count <=27:
-                gtCountDivs[idx] = 7-1
-            elif 28 <=count <=31:
-                gtCountDivs[idx] = 8-1
-            elif 32 <=count <= 35:
-                gtCountDivs[idx] = 9-1
-            elif 36 <=count <= 39:
-                gtCountDivs[idx] = 10-1
-            elif 40 <=count <=43:
-                gtCountDivs[idx] = 11-1
-            elif 44 <=count <=47:
-                gtCountDivs[idx] = 12-1
-            elif 48 <=count<= 51:
-                gtCountDivs[idx] = 13-1
-            elif 52 <=count <=55:
-                gtCountDivs[idx] = 14-1
-            elif 56 <=count <=59:
-                gtCountDivs[idx] = 15-1
-            elif 60 <=count <=63:
-                gtCountDivs[idx] = 16-1
-
-        #GtCountBins_list = []
-        #GtCountOneHot_list = [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0]
-        #for Val in GtCountsDiv_list:
-        #    GtCountOneHot_list[Val-1]=1
-        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
-
-        return gtCountDivs  #GtCountBins_list
-
-    def div_stage3(self, counts):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = counts.cpu().numpy()
-        gtCountDivs = counts.copy()
-        for idx, count in enumerate(counts):
-            if count ==0:
-                gtCountDivs[idx] = 0
-            else:
-                gtCountDivs[idx] -= 1
-
-        #GtCountBins_list = []
-        #GtCountOneHot_list = [0 for i in range(64)]
-        #for Val in GtCountsDiv_list:
-        #    GtCountOneHot_list[Val-1]=1
-        #    GtCountBins_list.append(copy.deepcopy(GtCountOneHot_list))
-
-        return gtCountDivs  #GtCountBins_list
-
-    def matchCountWeights(self, countWeights):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = np.array(torch.tensor(countWeights, device='cpu'))
-        # Counts_np = CountWeights.cpu().numpy()
-        gtCountDivs = counts.copy()
-        return [[11*val,9*val,7*val,5*val,3*val,1*val] for val in gtCountDivs]
-
-    def matchCountWeights_stage1(self, countWeights):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = np.array(torch.tensor(countWeights, device='cpu'))
-        # Counts_np = CountWeights.cpu().numpy()
-        gtCountDivs = counts.copy()
-        return [[32*val,16*val,0*val,0*val,0*val,0*val] for val in gtCountDivs]
-
-    def matchCountWeights_stage2(self, countWeights):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = np.array(torch.tensor(countWeights, device='cpu'))
-        # Counts_np = CountWeights.cpu().numpy()
-        gtCountDivs = counts.copy()
-        return [[32*val,16*val,8*val,4*val,0*val,0*val] for val in gtCountDivs]
-
-    def matchCountWeights_stage3(self, countWeights):
-        ''' Stage1: Divide the range into 8 parts. '''
-        counts = np.array(torch.tensor(countWeights, device='cpu'))
-        # Counts_np = CountWeights.cpu().numpy()
-        gtCountDivs = counts.copy()
-        return [[32*val,16*val,8*val,4*val,2*val,1*val] for val in gtCountDivs]
-
-    def int2bin(self, val):
-        valB = bin(val)
-        valB = valB[2:].zfill(6)        # 填充0，最长8位
-        bins = [int(e) for e in valB]
-        return bins if len(bins) == 6 else [0, 0, 0, 0, 0, 1]
-
-    def bin2int(self, bins):
-        if len(bins) != 6:
-            return 1
-        valB = ''.join('0' if e < 0.5 else '1' for e in bins)
-        return int(valB, 2)
-
-    def div_count(self, counts, stage, num_stages=3):
-        assert stage < num_stages
+    def div_counts(self, counts, stage):
+        assert stage < self.num_stages
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
 
-        num_digits = math.ceil(math.log(self.num_counts))
-        coarse_digits = (num_digits // num_stages) + 1 if (num_digits % num_stages != 0) \
-                        else (num_digits // num_stages)
-        coarse_counts = (num_digits % num_stages) if (stage == 0 and num_digits % num_stages != 0) \
-                        else 2**coarse_digits
+        total_digits = math.ceil(math.log(self.num_counts))
+        stage_digits = (total_digits % self.num_stages) if (stage == 0 and total_digits % self.num_stages != 0) \
+                        else math.ceil(total_digits / self.num_stages)
+        interval = 1 << ((self.num_stages - stage - 1) * math.ceil(total_digits / self.num_stages))
+        # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
 
-        lower = coarse_counts << (num_stages - stage - 1)
-        upper = (coarse_counts << (num_stages - stage)) - 1
-        valid_mask = torch.logical_and(lower < counts, counts < upper)
-        return valid_mask.to(torch.float32)     # 二分类
+        coarse_counts = torch.ceil(counts / interval).to(torch.long)
+        return coarse_counts

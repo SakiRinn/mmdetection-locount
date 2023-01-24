@@ -646,19 +646,40 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                  test_cfg=None,
                  pretrained=None,
                  init_cfg=None):
-        super(CascadeRoIHeadWithCount, self).__init__(
-            num_stages,
-            stage_loss_weights,
-            bbox_roi_extractor,
-            bbox_head,
-            mask_roi_extractor,
-            mask_head,
-            shared_head,
-            train_cfg,
-            test_cfg,
-            pretrained,
-            init_cfg
-        )
+        assert bbox_roi_extractor is not None
+        assert bbox_head is not None
+        assert shared_head is None, \
+            'Shared head is not supported in Cascade RCNN anymore'
+
+        self.num_stages = num_stages
+        self.stage_loss_weights = stage_loss_weights
+        super(CascadeRoIHead, self).__init__(
+            bbox_roi_extractor=bbox_roi_extractor,
+            bbox_head=bbox_head,
+            mask_roi_extractor=mask_roi_extractor,
+            mask_head=mask_head,
+            shared_head=shared_head,
+            train_cfg=train_cfg,
+            test_cfg=test_cfg,
+            pretrained=pretrained,
+            init_cfg=init_cfg)
+
+    def init_bbox_head(self, bbox_roi_extractor, bbox_head):
+        self.bbox_roi_extractor = ModuleList()
+        self.bbox_head = ModuleList()
+
+        if not isinstance(bbox_roi_extractor, list):
+            bbox_roi_extractor = [
+                bbox_roi_extractor for _ in range(self.num_stages)
+            ]
+        if not isinstance(bbox_head, list):
+            bbox_head = [bbox_head for _ in range(self.num_stages)]
+        assert len(bbox_roi_extractor) == len(bbox_head) == self.num_stages
+
+        for roi_extractor, head in zip(bbox_roi_extractor, bbox_head):
+            head.update(num_stages=self.num_stages)
+            self.bbox_roi_extractor.append(build_roi_extractor(roi_extractor))
+            self.bbox_head.append(build_head(head))
 
     def _bbox_forward(self, stage, x, rois):
         bbox_roi_extractor = self.bbox_roi_extractor[stage]
@@ -679,13 +700,13 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                                                          gt_bboxes,
                                                          gt_labels,
                                                          gt_counts,             # ADD
-                                                         rcnn_train_cfg)
+                                                         rcnn_train_cfg)        # type: ignore
         loss_bbox = self.bbox_head[stage].loss(bbox_results['cls_score'],
                                                bbox_results['bbox_pred'],
                                                bbox_results['cnt_score'],       # ADD
                                                rois,
                                                stage,
-                                               *bbox_targets)
+                                               *bbox_targets)                   # type: ignore
 
         bbox_results.update(
             loss_bbox=loss_bbox, rois=rois, bbox_targets=bbox_targets)
@@ -973,12 +994,12 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                         img_meta[0])
 
             cls_score = sum(ms_scores) / float(len(ms_scores))
-            count_score = sum(ms_cnt_scores) / float(len(ms_cnt_scores))
+            cnt_score = sum(ms_cnt_scores) / float(len(ms_cnt_scores))
             bboxes, scores, cnt_scores = self.bbox_head[-1].get_bboxes(
                 rois,
                 cls_score,
                 bbox_results['bbox_pred'],
-                count_score,
+                cnt_score,
                 img_shape,
                 scale_factor,
                 rescale=False,

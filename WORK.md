@@ -24,13 +24,15 @@
 ### 其它
 * `tools/misc/locount_txt2json.py`\
   **新文件**。将原为`.txt`格式的annotations转化为单个`.json`文件。
+* `mmdet/datasets/coco.py`\
+  修改`CLASSES`常量与`coco_classes`一致，以及`_parse_ann_info`函数。
 
 
 ## 模型
-该部分修改主要在`mmdet/model/`下进行。
+该部分修改主要在`mmdet/models/`下进行。
 
 ### `models/detectors`部分
-仅基类可复用。
+已完工，仅基类可复用。
 * `mmdet/models/detectors/two_stage.py`\
   **基类**。添加`TwoStageDetectorWithCount`类。\
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
@@ -60,10 +62,10 @@
 
 
 ## 数据采样
-该部分修改主要在`mmdet/core/`下进行。
+该部分修改主要在`mmdet/core/bbox/`下进行。
 全部已完工，可复用。
 
-### `core/assigners`部分
+### `core/bbox/assigners`部分
 用于指定正负样本。
 * `mmdet/core/bbox/assigners/base_assigner.py`\
   **基类**。添加`BaseAssignerWithCount`类，添加了`gt_counts`变量。
@@ -72,7 +74,7 @@
 * `mmdet/core/bbox/assigners/assign_result.py`\
   添加`AssignResultWithCount`类。
 
-### `core/samplers`部分
+### `core/bbox/samplers`部分
 用于指定后对样本采样。
 * `mmdet/core/bbox/assigners/base_sampler.py`\
   **基类**。添加`BaseSamplerWithCount`类，添加了`gt_counts`变量。
@@ -84,10 +86,7 @@
 ### 其它
 * `mmdet/core/bbox/transforms.py`\
   `bbox2result`函数中添加`counts`参数。
-* `mmdet/core/evaluation/class_names.py`\
-  修改`coco_classes`中的类型。
-* `mmdet/datasets/coco.py`\
-  修改`CLASSES`常量与`coco_classes`一致，以及`_parse_ann_info`函数。
+
 
 ## 配置文件
 该部分修改主要在`configs/`下进行。
@@ -98,7 +97,7 @@
 * `configs/locount/cascade_rcnn_r50_fpn_1x_locount.py`\
   **新文件**。用于整合。
 
-# 启动
+# 备注
 ## 生成数据集配置
 单独运行`tools/misc/locount_txt2json.py`中的`txt2json`函数，将得到的json文件放到数据文件夹。
 
@@ -116,5 +115,12 @@ if __name__ == '__main__':
 python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py
 ```
 
-## 现有问题
-暂无。删除了nms对counts的作用。
+## 推理
+运行`tools/test.py`脚本，指定一个config文件和一个checkpoint.
+```sh
+python tools/test.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py work_dirs/cascade_rcnn_r50_fpn_1x_locount/latest.pth
+```
+
+## TODO
+修改roi_heads，检查可复用性。
+检查metric的计算。

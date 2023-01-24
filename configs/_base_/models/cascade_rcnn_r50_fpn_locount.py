@@ -212,7 +212,7 @@ model = dict(
                 pos_weight=-1,
                 debug=False)
         ],
-        stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters   2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]  mmdet/models/detectors/cascade rcnn),
+        stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters, 2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,
