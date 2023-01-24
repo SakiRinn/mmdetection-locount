@@ -233,7 +233,7 @@ class Shared4Conv1FCBBoxHead(ConvFCBBoxHead):
 
 
 @HEADS.register_module()
-class FCBBoxHeadWithCount(BBoxHeadWithCount):
+class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
     r"""More general bbox head, with shared conv and fc layers and two optional
     separated branches and cnt specific branches.
 
@@ -329,17 +329,17 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
                 in_features=self.reg_last_dim,
                 out_features=out_dim_reg)
         if self.with_cnt:
-            # Stage1 has 4 Classes; Stage2 has 16 Classes; Stage3 has 64 Classes
-            self.fc_cnt = nn.Linear(self.cnt_last_dim, self.num_counts)
+            # self.fc_cnt = nn.Linear(self.cnt_last_dim, self.coarse_counts)
+            if self.custom_cnt_channels:
+                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            else:
+                cnt_channels = self.coarse_counts
+            self.fc_cnt = build_linear_layer(
+                self.cnt_predictor_cfg,
+                in_features=self.cnt_last_dim,
+                out_features=cnt_channels)
 
         if init_cfg is None:
-            # when init_cfg is None,
-            # It has been set to
-            # [[dict(type='Normal', std=0.01, override=dict(name='fc_cls'))],
-            #  [dict(type='Normal', std=0.001, override=dict(name='fc_reg'))]
-            # after `super(ConvFCBBoxHead, self).__init__()`
-            # we only need to append additional configuration
-            # for `shared_fcs`, `cls_fcs` and `reg_fcs`
             self.init_cfg += [
                 dict(
                     type='Xavier',
@@ -351,47 +351,6 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
                         dict(name='cnt_fcs')
                     ])
             ]
-
-    def _add_conv_fc_branch(self,
-                            num_branch_convs,
-                            num_branch_fcs,
-                            in_channels,
-                            is_shared=False):
-        """Add shared or separable branch.
-
-        convs -> avg pool (optional) -> fcs
-        """
-        last_layer_dim = in_channels
-        # add branch specific conv layers
-        branch_convs = nn.ModuleList()
-        if num_branch_convs > 0:
-            for i in range(num_branch_convs):
-                conv_in_channels = (
-                    last_layer_dim if i == 0 else self.conv_out_channels)
-                branch_convs.append(
-                    ConvModule(
-                        conv_in_channels,
-                        self.conv_out_channels,
-                        3,
-                        padding=1,
-                        conv_cfg=self.conv_cfg,
-                        norm_cfg=self.norm_cfg))
-            last_layer_dim = self.conv_out_channels
-        # add branch specific fc layers
-        branch_fcs = nn.ModuleList()
-        if num_branch_fcs > 0:
-            # for shared branch, only consider self.with_avg_pool
-            # for separated branches, also consider self.num_shared_fcs
-            if (is_shared
-                    or self.num_shared_fcs == 0) and not self.with_avg_pool:
-                last_layer_dim *= self.roi_feat_area
-            for i in range(num_branch_fcs):
-                fc_in_channels = (
-                    last_layer_dim if i == 0 else self.fc_out_channels)
-                branch_fcs.append(
-                    nn.Linear(fc_in_channels, self.fc_out_channels))
-            last_layer_dim = self.fc_out_channels
-        return branch_convs, branch_fcs, last_layer_dim
 
     def forward(self, x):
         # shared part
@@ -412,6 +371,7 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
         x_reg = x
         x_cnt = x
 
+        # cls
         for conv in self.cls_convs:
             x_cls = conv(x_cls)
         if x_cls.dim() > 2:
@@ -420,7 +380,7 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
             x_cls = x_cls.flatten(1)
         for fc in self.cls_fcs:
             x_cls = self.relu(fc(x_cls))
-
+        # reg
         for conv in self.reg_convs:
             x_reg = conv(x_reg)
         if x_reg.dim() > 2:
@@ -429,7 +389,7 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
             x_reg = x_reg.flatten(1)
         for fc in self.reg_fcs:
             x_reg = self.relu(fc(x_reg))
-
+        # cnt
         for conv in self.cnt_convs:
             x_cnt = conv(x_cnt)
         if x_cnt.dim() > 2:
@@ -441,5 +401,5 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        cnt_score = self.fc_cnt(x_reg) if self.with_cnt else None       # ADD
+        cnt_score = self.fc_cnt(x_cnt) if self.with_cnt else None       # ADD
         return cls_score, bbox_pred, cnt_score

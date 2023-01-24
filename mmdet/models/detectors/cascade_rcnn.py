@@ -72,16 +72,6 @@ class CascadeRCNNWithCount(TwoStageDetectorWithCount):
             init_cfg=init_cfg)
 
     def show_result(self, data, result, **kwargs):
-        """Show prediction results of the detector.
-
-        Args:
-            data (str or np.ndarray): Image filename or loaded image.
-            result (Tensor or tuple): The results to draw over `img`
-                bbox_result or (bbox_result, segm_result).
-
-        Returns:
-            np.ndarray: The image with bboxes drawn on it.
-        """
         if self.with_mask:
             ms_bbox_result, ms_segm_result = result
             if isinstance(ms_bbox_result, dict):
@@ -90,4 +80,4 @@ class CascadeRCNNWithCount(TwoStageDetectorWithCount):
         else:
             if isinstance(result, dict):
                 result = result['ensemble']
-        return super(CascadeRCNN, self).show_result(data, result, **kwargs)
+        return super(CascadeRCNNWithCount, self).show_result(data, result, **kwargs)
