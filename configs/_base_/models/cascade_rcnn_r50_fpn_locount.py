@@ -49,8 +49,8 @@ model = dict(
         bbox_head=[
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
-                num_shared_fcs=2,
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 num_cls_fcs=1,
                 num_reg_fcs=1,
                 num_cnt_fcs=1,
@@ -78,8 +78,8 @@ model = dict(
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
-                num_shared_fcs=2,
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 num_cls_fcs=1,
                 num_reg_fcs=1,
                 num_cnt_fcs=1,
@@ -107,8 +107,8 @@ model = dict(
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
-                num_shared_fcs=2,
+                num_shared_convs=4,
+                num_shared_fcs=1,
                 num_cls_fcs=1,
                 num_reg_fcs=1,
                 num_cnt_fcs=1,
