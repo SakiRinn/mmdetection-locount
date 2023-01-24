@@ -676,8 +676,8 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             bbox_head = [bbox_head for _ in range(self.num_stages)]
         assert len(bbox_roi_extractor) == len(bbox_head) == self.num_stages
 
-        for roi_extractor, head in zip(bbox_roi_extractor, bbox_head):
-            head.update(num_stages=self.num_stages)
+        for i, (roi_extractor, head) in enumerate(zip(bbox_roi_extractor, bbox_head)):
+            head.update(current_stage=i, num_stages=self.num_stages)
             self.bbox_roi_extractor.append(build_roi_extractor(roi_extractor))
             self.bbox_head.append(build_head(head))
 
@@ -705,7 +705,6 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                                                bbox_results['bbox_pred'],
                                                bbox_results['cnt_score'],       # ADD
                                                rois,
-                                               stage,
                                                *bbox_targets)                   # type: ignore
 
         bbox_results.update(

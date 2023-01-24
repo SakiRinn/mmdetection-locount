@@ -252,7 +252,6 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
                  num_reg_fcs=0,
                  num_cnt_convs=0,
                  num_cnt_fcs=0,
-                 num_stages=0,
                  conv_out_channels=256,
                  fc_out_channels=1024,
                  conv_cfg=None,
@@ -281,7 +280,6 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
         self.num_reg_fcs = num_reg_fcs
         self.num_cnt_convs = num_cnt_convs
         self.num_cnt_fcs = num_cnt_fcs
-        self.num_stages = num_stages                    # ADD
         self.conv_out_channels = conv_out_channels
         self.fc_out_channels = fc_out_channels
         self.conv_cfg = conv_cfg
@@ -331,8 +329,14 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
                 in_features=self.reg_last_dim,
                 out_features=out_dim_reg)
         if self.with_cnt:
-            # Stage1 has 4 Classes; Stage2 has 16 Classes; Stage3 has 64 Classes
-            self.fc_cnt = nn.Linear(self.cnt_last_dim, self.num_counts)
+            if self.custom_cnt_channels:
+                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            else:
+                cnt_channels = self.coarse_counts
+            self.fc_cnt = build_linear_layer(
+                self.cnt_predictor_cfg,
+                in_features=self.cnt_last_dim,
+                out_features=cnt_channels)
 
         if init_cfg is None:
             # when init_cfg is None,
@@ -403,5 +407,5 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        cnt_score = self.fc_cnt(x_reg) if self.with_cnt else None       # ADD
+        cnt_score = self.fc_cnt(x_cnt) if self.with_cnt else None       # ADD
         return cls_score, bbox_pred, cnt_score

@@ -592,10 +592,7 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
         else:
             self.cls_out_channels = num_classes + 1
         # self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)
-        # if self.use_sigmoid_cnt:
-        #     self.cnt_out_channels = num_counts
-        # else:
-        #     self.cnt_out_channels = num_counts + 1
+        # self.cnt_out_channels = num_counts
 
         if self.cls_out_channels <= 0:
             raise ValueError(f'num_classes={num_classes} is too small')

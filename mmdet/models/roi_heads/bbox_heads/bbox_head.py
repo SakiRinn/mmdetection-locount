@@ -601,7 +601,6 @@ class BBoxHead(BaseModule):
 class BBoxHeadWithCount(BBoxHead):
 
     def __init__(self,
-                 num_stages=0,
                  with_avg_pool=False,
                  with_cls=True,
                  with_reg=True,
@@ -610,6 +609,8 @@ class BBoxHeadWithCount(BBoxHead):
                  in_channels=256,
                  num_classes=80,
                  num_counts=57,                                     # ADD
+                 current_stage=0,
+                 num_stages=0,
                  bbox_coder=dict(
                      type='DeltaXYWHBBoxCoder',
                      clip_border=True,
@@ -635,7 +636,6 @@ class BBoxHeadWithCount(BBoxHead):
                  init_cfg=None):
         super(BBoxHead, self).__init__(init_cfg)
         assert with_cls or with_reg or with_cnt
-        self.num_stages = num_stages
         self.with_avg_pool = with_avg_pool
         self.with_cls = with_cls
         self.with_reg = with_reg
@@ -644,13 +644,16 @@ class BBoxHeadWithCount(BBoxHead):
         self.roi_feat_area = self.roi_feat_size[0] * self.roi_feat_size[1]
         self.in_channels = in_channels
         self.num_classes = num_classes
-        self.num_counts = num_counts
         self.reg_class_agnostic = reg_class_agnostic
         self.reg_decoded_bbox = reg_decoded_bbox
         self.reg_predictor_cfg = reg_predictor_cfg
         self.cls_predictor_cfg = cls_predictor_cfg
         self.cnt_predictor_cfg = cnt_predictor_cfg
         self.fp16_enabled = False
+
+        self.current_stage = current_stage
+        self.num_stages = num_stages
+        self.num_counts = num_counts
 
         self.bbox_coder = build_bbox_coder(bbox_coder)
         self.loss_cls = build_loss(loss_cls)
@@ -662,24 +665,34 @@ class BBoxHeadWithCount(BBoxHead):
             self.avg_pool = nn.AvgPool2d(self.roi_feat_size)
         else:
             in_channels *= self.roi_feat_area
+        # cls
         if self.with_cls:
-            # need to add background class
             if self.custom_cls_channels:
                 cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
             else:
-                cls_channels = num_classes + 1
+                cls_channels = num_classes + 1          # need to add background class
             self.fc_cls = build_linear_layer(
                 self.cls_predictor_cfg,
                 in_features=in_channels,
                 out_features=cls_channels)
+        # reg
         if self.with_reg:
             out_dim_reg = 4 if reg_class_agnostic else 4 * num_classes
             self.fc_reg = build_linear_layer(
                 self.reg_predictor_cfg,
                 in_features=in_channels,
                 out_features=out_dim_reg)
+        # cnt
         if self.with_cnt:
-            self.fc_cnt = nn.Linear(in_channels, num_counts)
+            # self.fc_cnt = nn.Linear(in_channels, self.coarse_counts)
+            if self.custom_cnt_channels:
+                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            else:
+                cnt_channels = self.coarse_counts       # NOT need to add background class
+            self.fc_cnt = build_linear_layer(
+                self.cnt_predictor_cfg,
+                in_features=in_channels,
+                out_features=cnt_channels)
         self.debug_imgs = None
         if init_cfg is None:
             self.init_cfg = []
@@ -698,6 +711,12 @@ class BBoxHeadWithCount(BBoxHead):
                     dict(
                         type='Normal', std=0.001, override=dict(name='fc_cnt'))
                 ]
+
+    @property
+    def coarse_counts(self):
+        total_digits = math.ceil(math.log(self.num_counts))
+        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
+        return math.ceil(self.num_counts / interval)
 
     @property
     def custom_cnt_channels(self):
@@ -737,6 +756,7 @@ class BBoxHeadWithCount(BBoxHead):
         counts = pos_bboxes.new_full((num_samples, ),
                                      self.num_counts,
                                      dtype=torch.long)
+        counts = self.div_counts(counts)
         count_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
         bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
@@ -794,7 +814,6 @@ class BBoxHeadWithCount(BBoxHead):
              bbox_pred,
              cnt_score,
              rois,
-             stage,
              labels,
              label_weights,
              bbox_targets,
@@ -804,10 +823,9 @@ class BBoxHeadWithCount(BBoxHead):
              reduction_override=None):
         losses = dict()
 
-        learning_bbox_weights = 1.0 * pow(2, -stage)
-        learning_cls_weights  = 1.0 * pow(2, -stage)
+        learning_bbox_weights = 1.0 * pow(2, -self.current_stage)
+        learning_cls_weights  = 1.0 * pow(2, -self.current_stage)
         learning_cnt_weights  = pow(2, 2 - self.num_stages)
-        counts = self.div_counts(counts, stage)
         # counts = torch.from_numpy(np.array(self.div_stage1(counts))).cuda()
         # count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
 
@@ -932,16 +950,15 @@ class BBoxHeadWithCount(BBoxHead):
             nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
             nn.init.constant_(self.fc_cnt.bias, 0)
 
-    def div_counts(self, counts, stage):
-        assert stage < self.num_stages
+    def div_counts(self, counts):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
 
         total_digits = math.ceil(math.log(self.num_counts))
-        stage_digits = (total_digits % self.num_stages) if (stage == 0 and total_digits % self.num_stages != 0) \
+        stage_digits = (total_digits % self.num_stages) if (self.current_stage == 0 and total_digits % self.num_stages != 0) \
                         else math.ceil(total_digits / self.num_stages)
-        interval = 1 << ((self.num_stages - stage - 1) * math.ceil(total_digits / self.num_stages))
+        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
 
-        coarse_counts = torch.ceil(counts / interval).to(torch.long)
-        return coarse_counts
+        new_counts = torch.floor(counts / interval).to(torch.long)
+        return new_counts
