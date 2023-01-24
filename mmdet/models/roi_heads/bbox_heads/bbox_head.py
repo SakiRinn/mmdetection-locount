@@ -684,15 +684,15 @@ class BBoxHeadWithCount(BBoxHead):
                 out_features=out_dim_reg)
         # cnt
         if self.with_cnt:
-            self.fc_cnt = nn.Linear(in_channels, self.coarse_counts)
-            # if self.custom_cnt_channels:
-            #     cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
-            # else:
-            #     cnt_channels = self.coarse_counts       # NOT need to add background class
-            # self.fc_cnt = build_linear_layer(
-            #     self.cnt_predictor_cfg,
-            #     in_features=in_channels,
-            #     out_features=cnt_channels)
+            # self.fc_cnt = nn.Linear(in_channels, cnt_channels)
+            if self.custom_cnt_channels:
+                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            else:
+                cnt_channels = self.coarse_counts       # NOT need to add background class
+            self.fc_cnt = build_linear_layer(
+                self.cnt_predictor_cfg,
+                in_features=in_channels,
+                out_features=cnt_channels)
         self.debug_imgs = None
         if init_cfg is None:
             self.init_cfg = []
@@ -826,8 +826,6 @@ class BBoxHeadWithCount(BBoxHead):
         learning_bbox_weights = 1.0 * pow(2, -self.current_stage)
         learning_cls_weights  = 1.0 * pow(2, -self.current_stage)
         learning_cnt_weights  = pow(2, 2 - self.num_stages)
-        # counts = torch.from_numpy(np.array(self.div_stage1(counts))).cuda()
-        # count_weights = torch.from_numpy(np.array(self.matchCountWeights_stage1(count_weights),np.float32)).cuda()
 
         # bbox
         if bbox_pred is not None:
@@ -872,33 +870,24 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['acc'] = accuracy(cls_score, labels)
         # cnt
-        # if cnt_score is not None:
-        #     avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
-        #     if cnt_score.numel() > 0:
-        #         loss_cnt_ = learning_cnt_weights * self.loss_cnt(
-        #             cnt_score,
-        #             counts,
-        #             count_weights,
-        #             avg_factor=avg_cnt_factor,
-        #             reduction_override=reduction_override)
-        #         if isinstance(loss_cnt_, dict):
-        #             losses.update(loss_cnt_)
-        #         else:
-        #             losses['loss_cnt'] = loss_cnt_
-        #         if self.custom_cnt_activation:
-        #             acc_cnt_ = self.loss_cnt.get_accuracy(cnt_score, counts)
-        #             losses.update(acc_cnt_)
-        #         else:
-        #             losses['acc_cnt'] = accuracy(cnt_score, counts)
         if cnt_score is not None:
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
-            losses['loss_cnt'] = learning_cnt_weights * self.loss_cnt(
-                cnt_score,
-                counts,
-                count_weights,
-                avg_factor=avg_cnt_factor,
-                reduction_override=reduction_override)
-            losses['acc_cnt'] = accuracy(cnt_score, counts)
+            if cnt_score.numel() > 0:
+                loss_cnt_ = learning_cnt_weights * self.loss_cnt(
+                    cnt_score,
+                    counts,
+                    count_weights,
+                    avg_factor=avg_cnt_factor,
+                    reduction_override=reduction_override)
+                if isinstance(loss_cnt_, dict):
+                    losses.update(loss_cnt_)
+                else:
+                    losses['loss_cnt'] = loss_cnt_
+                if self.custom_cnt_activation:
+                    acc_cnt_ = self.loss_cnt.get_accuracy(cnt_score, counts)
+                    losses.update(acc_cnt_)
+                else:
+                    losses['acc_cnt'] = accuracy(cnt_score, counts)
 
         return losses
 

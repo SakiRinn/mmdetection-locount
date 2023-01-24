@@ -329,24 +329,17 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
                 in_features=self.reg_last_dim,
                 out_features=out_dim_reg)
         if self.with_cnt:
-            self.fc_cnt = nn.Linear(self.cnt_last_dim, self.coarse_counts)
-            # if self.custom_cnt_channels:
-            #     cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
-            # else:
-            #     cnt_channels = self.coarse_counts
-            # self.fc_cnt = build_linear_layer(
-            #     self.cnt_predictor_cfg,
-            #     in_features=self.cnt_last_dim,
-            #     out_features=cnt_channels)
+            # self.fc_cnt = nn.Linear(self.cnt_last_dim, self.coarse_counts)
+            if self.custom_cnt_channels:
+                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            else:
+                cnt_channels = self.coarse_counts
+            self.fc_cnt = build_linear_layer(
+                self.cnt_predictor_cfg,
+                in_features=self.cnt_last_dim,
+                out_features=cnt_channels)
 
         if init_cfg is None:
-            # when init_cfg is None,
-            # It has been set to
-            # [[dict(type='Normal', std=0.01, override=dict(name='fc_cls'))],
-            #  [dict(type='Normal', std=0.001, override=dict(name='fc_reg'))]
-            # after `super(ConvFCBBoxHead, self).__init__()`
-            # we only need to append additional configuration
-            # for `shared_fcs`, `cls_fcs` and `reg_fcs`
             self.init_cfg += [
                 dict(
                     type='Xavier',

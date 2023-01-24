@@ -52,13 +52,14 @@
   基本无修改，仅指定了`loss`函数的`gt_count=None`.
 
 ### `models/roi_heads`部分
-仅基类可复用。
+已完工，仅基类可复用。
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
-  **基类**。添加`BBoxHeadWithCount`类。
+  **基类**。添加`BBoxHeadWithCount`类。\
+  实现了随stage数count预测从模糊到精确的过程，具体为`div_counts`函数和`coarse_counts`属性（替代原`num_counts`）。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
   添加`FCBBoxHeadWithCount`类，具体添加了一个cnt头。
 * `mmdet/models/roi_heads/cascade_roi_head.py`\
-  添加`CascadeRoIHeadWithCount`类。
+  添加`CascadeRoIHeadWithCount`类，具体添加了cnt相关部分。
 
 
 ## 数据采样
