@@ -441,5 +441,5 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount):
 
         cls_score = self.fc_cls(x_cls) if self.with_cls else None
         bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        cnt_score = self.fc_cnt(x_reg) if self.with_cnt else None       # ADD
+        cnt_score = self.fc_cnt(x_cnt) if self.with_cnt else None       # ADD
         return cls_score, bbox_pred, cnt_score
