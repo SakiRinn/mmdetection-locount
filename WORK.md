@@ -22,7 +22,9 @@
   ```
 
 ### 其它
-* `tools/misc/locount_txt2json.py`\
+* `cntcocotools`包
+  重写了`pytotocools`包，添加了count相关部分。
+* `cntcocotools/txt2json.py`\
   **新文件**。将原为`.txt`格式的annotations转化为单个`.json`文件。
 * `mmdet/datasets/coco.py`\
   修改`CLASSES`常量与`coco_classes`一致，以及`_parse_ann_info`函数。
