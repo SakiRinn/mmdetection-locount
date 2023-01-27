@@ -113,7 +113,7 @@ def roi2bbox(rois):
     return bbox_list
 
 
-def bbox2result(bboxes, labels, counts, num_classes):
+def bbox2result(bboxes, labels, num_classes):
     """Convert detection results to a list of numpy arrays.
 
     Args:
@@ -130,8 +130,19 @@ def bbox2result(bboxes, labels, counts, num_classes):
         if isinstance(bboxes, torch.Tensor):
             bboxes = bboxes.detach().cpu().numpy()
             labels = labels.detach().cpu().numpy()
-            counts = counts.detach().cpu().numpy()
         return [bboxes[labels == i, :] for i in range(num_classes)]
+
+
+def bbox2result_with_count(bboxes, labels, counts, num_classes, num_counts):
+    if bboxes.shape[0] == 0:
+        return [np.zeros((0, 5), dtype=np.float32) for i in range(num_classes)]
+    else:
+        if isinstance(bboxes, torch.Tensor):
+            bboxes = bboxes.detach().cpu().numpy()
+            labels = labels.detach().cpu().numpy()
+            counts = counts.detach().cpu().numpy()
+        return [[bboxes[np.logical_and(counts == i, labels == j), :]
+                for i in range(num_counts)] for j in range(num_classes)]
 
 
 def distance2bbox(points, distance, max_shape=None):

@@ -825,7 +825,7 @@ class BBoxHeadWithCount(BBoxHead):
 
         learning_bbox_weights = 1.0 * pow(2, -self.current_stage)
         learning_cls_weights  = 1.0 * pow(2, -self.current_stage)
-        learning_cnt_weights  = pow(2, 2 - self.num_stages)
+        learning_cnt_weights  = pow(2, 1 - self.num_stages)
 
         # bbox
         if bbox_pred is not None:
@@ -907,6 +907,12 @@ class BBoxHeadWithCount(BBoxHead):
             scores = F.softmax(
                 cls_score, dim=-1) if cls_score is not None else None
 
+        if self.custom_cnt_channels:
+            cnt_scores = self.loss_cnt.get_activation(cnt_score)
+        else:
+            cnt_scores = F.softmax(
+                cnt_score, dim=-1) if cnt_score is not None else None
+
         if bbox_pred is not None:
             bboxes = self.bbox_coder.decode(
                 rois[..., 1:], bbox_pred, max_shape=img_shape)
@@ -922,19 +928,19 @@ class BBoxHeadWithCount(BBoxHead):
                 bboxes.size()[0], -1)
 
         # Determine the counts for all bboxes.
-        if isinstance(cnt_score, list):
-            cnt_score = sum(cnt_score) / float(len(cnt_score))
-        count = F.softmax(cnt_score, dim=-1) if cnt_score is not None else None
-        argMax = torch.argmax(count, dim=-1) + 1
-        count = argMax.unsqueeze(-1).type(torch.float)     # Just one number.
+        if isinstance(cnt_scores, list):
+            cnt_scores = sum(cnt_scores) / float(len(cnt_scores))
+        counts = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
+        argMax = torch.argmax(counts, dim=-1) + 1
+        counts = argMax.unsqueeze(-1).type(torch.long)     # Just one number.
 
         if cfg is None:
-            counts = count.expand(bboxes.size(0))
-            return bboxes, scores, counts
+            return bboxes, scores, cnt_scores
         else:
-            det_bboxes, det_labels = multiclass_nms(bboxes, scores,
-                                                    cfg.score_thr, cfg.nms, cfg.max_per_img)
-            det_counts = count.expand(det_bboxes.size(0))
+            det_bboxes, det_labels, inds = multiclass_nms(bboxes, scores,
+                                                          cfg.score_thr, cfg.nms, cfg.max_per_img,
+                                                          return_inds=True)
+            det_counts = counts.expand(-1, self.num_classes).reshape(-1)[inds]
             return det_bboxes, det_labels, det_counts
 
     def init_weights(self):
