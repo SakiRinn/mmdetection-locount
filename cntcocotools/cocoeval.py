@@ -25,7 +25,6 @@ class COCOeval:
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
-            # self.params.cntIds = sorted(cocoGt.getCntIds())
 
     def _prepare(self):
         def _toMask(anns, coco):
@@ -54,9 +53,9 @@ class COCOeval:
         self._gts = defaultdict(list)
         self._dts = defaultdict(list)
         for gt in gts:
-            self._gts[gt['image_id'], gt['category_id']].append(gt)
+            self._gts[gt['image_id'], gt['category_id'], gt['count']].append(gt)
         for dt in dts:
-            self._dts[dt['image_id'], dt['category_id']].append(dt)
+            self._dts[dt['image_id'], dt['category_id'], gt['count']].append(dt)
         self.evalImgs = defaultdict(list)
         self.eval     = {}
 
@@ -90,9 +89,8 @@ class COCOeval:
 
         evaluateImg = self.evaluateImg
         maxDet = p.maxDets[-1]
-        self.evalImgs = [evaluateImg(imgId, catId, cntId, areaRng, maxDet)
+        self.evalImgs = [evaluateImg(imgId, catId, areaRng, maxDet)
                  for catId in catIds
-                 for cntId in cntIds
                  for areaRng in p.areaRng
                  for imgId in p.imgIds
              ]
@@ -168,7 +166,7 @@ class COCOeval:
                 ious[i, j] = np.sum(np.exp(-e)) / e.shape[0]
         return ious
 
-    def evaluateImg(self, imgId, catId, cntId, aRng, maxDet):
+    def evaluateImg(self, imgId, catId, aRng, maxDet):
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]

@@ -15,15 +15,16 @@ from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
 from mmdet.core.evaluation import coco_classes
-from .api_wrappers import COCO, COCOeval
+from .api_wrappers.cnt_coco_api import COCO, COCOeval
 from .builder import DATASETS
 from .custom import CustomDataset
 
 
 @DATASETS.register_module()
-class CocoDataset(CustomDataset):
+class CocoLocountDataset(CustomDataset):
 
     CLASSES = tuple(coco_classes())
+    COUNTS = 57
 #     PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
 #                (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
 #                (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
@@ -59,8 +60,9 @@ class CocoDataset(CustomDataset):
         # The order of returned `cat_ids` will not
         # change with the order of the CLASSES
         self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
+        self.cnt_ids = self.coco.get_cnt_ids(max_count=self.COUNTS)
 
-        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}       # {0:0, 1:1, ..., 139:139}
+        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
         self.img_ids = self.coco.get_img_ids()
         data_infos = []
         total_ann_ids = []
@@ -157,6 +159,8 @@ class CocoDataset(CustomDataset):
                 continue
             if ann['category_id'] not in self.cat_ids:
                 continue
+            if ann['count'] not in self.cnt_ids:
+                continue
             bbox = [x1, y1, x1 + w, y1 + h]
             if ann.get('iscrowd', False):
                 gt_bboxes_ignore.append(bbox)
@@ -241,6 +245,7 @@ class CocoDataset(CustomDataset):
                     data['bbox'] = self.xyxy2xywh(bboxes[i])
                     data['score'] = float(bboxes[i][4])
                     data['category_id'] = self.cat_ids[label]
+                    # data['count'] = ...
                     json_results.append(data)
         return json_results
 
@@ -260,6 +265,7 @@ class CocoDataset(CustomDataset):
                     data['bbox'] = self.xyxy2xywh(bboxes[i])
                     data['score'] = float(bboxes[i][4])
                     data['category_id'] = self.cat_ids[label]
+                    # data['count'] = ...
                     bbox_json_results.append(data)
 
                 # segm results
@@ -276,6 +282,7 @@ class CocoDataset(CustomDataset):
                     data['bbox'] = self.xyxy2xywh(bboxes[i])
                     data['score'] = float(mask_score[i])
                     data['category_id'] = self.cat_ids[label]
+                    # data['count'] = ...
                     if isinstance(segms[i]['counts'], bytes):
                         segms[i]['counts'] = segms[i]['counts'].decode()
                     data['segmentation'] = segms[i]

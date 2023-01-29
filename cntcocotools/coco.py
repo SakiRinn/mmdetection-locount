@@ -111,18 +111,9 @@ class COCO:
         ids = [cat['id'] for cat in cats]
         return ids
 
-    # def getCntIds(self, cntNms=[], cntIds=[]):
-    #     cntNms = cntNms if _isArrayLike(cntNms) else [cntNms]
-    #     cntIds = cntIds if _isArrayLike(cntIds) else [cntIds]
-
-    #     if len(cntNms) == len(cntIds) == 0:
-    #         cnts = self.dataset['counts']
-    #     else:
-    #         cnts = self.dataset['counts']
-    #         cnts = cnts if len(cntNms) == 0 else [cnt for cnt in cnts if cnt['name']          in cntNms]
-    #         cnts = cnts if len(cntIds) == 0 else [cnt for cnt in cnts if cnt['id']            in cntIds]
-    #     ids = [cnt['id'] for cnt in cnts]
-    #     return ids
+    def getCntIds(self, cntMax=0):
+        ids = list(range(cntMax))
+        return ids
 
     def getImgIds(self, imgIds=[], catIds=[]):
         imgIds = imgIds if _isArrayLike(imgIds) else [imgIds]

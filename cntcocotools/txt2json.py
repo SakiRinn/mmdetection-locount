@@ -26,7 +26,7 @@ def ann2rle(ann, h, w):
         return segm
 
 def ann2mask(self, ann):
-        rle = self.annToRLE(ann)
+        rle = self.ann2rle(ann)
         m = mask.decode(rle)
         return m
 
@@ -75,7 +75,7 @@ def txt2json(dir, json_path='ann_file'):
 
     ann_file = dict(images=images, annotations=annotations, categories=categories)
     with open(json_path, "w") as f:
-        json.dump(ann_file, f)
+        json.dump(ann_file, f, indent=4)
 
 
 if __name__ == '__main__':

@@ -714,9 +714,9 @@ class BBoxHeadWithCount(BBoxHead):
 
     @property
     def coarse_counts(self):
-        total_digits = math.ceil(math.log(self.num_counts))
-        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
-        return math.ceil(self.num_counts / interval)
+        num_digits = math.ceil(math.log(self.num_counts, 2))
+        stg_digits = math.ceil(num_digits / self.num_stages)
+        return 1 << (num_digits - (self.num_stages - self.current_stage - 1)*stg_digits)
 
     @property
     def custom_cnt_channels(self):
@@ -952,10 +952,9 @@ class BBoxHeadWithCount(BBoxHead):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
 
-        total_digits = math.ceil(math.log(self.num_counts))
-        stage_digits = (total_digits % self.num_stages) if (self.current_stage == 0 and total_digits % self.num_stages != 0) \
-                        else math.ceil(total_digits / self.num_stages)
-        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
+        num_digits = math.ceil(math.ceil(math.log(self.num_counts, 2)))
+        stg_digits = math.ceil(num_digits / self.num_stages)
+        interval = 1 << ((self.num_stages - self.current_stage - 1)*stg_digits)
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
 
         new_counts = torch.floor(counts / interval).to(torch.long)
