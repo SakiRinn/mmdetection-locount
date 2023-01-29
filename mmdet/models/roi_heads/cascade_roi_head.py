@@ -6,7 +6,7 @@ from mmcv.runner import ModuleList
 
 from mmdet.core import (bbox2result, bbox2roi, bbox_mapping, build_assigner,
                         build_sampler, merge_aug_bboxes, merge_aug_masks,
-                        multiclass_nms)
+                        multiclass_nms, bbox2result_with_count)
 from ..builder import HEADS, build_head, build_roi_extractor
 from .base_roi_head import BaseRoIHead
 from .test_mixins import BBoxTestMixin, MaskTestMixin
@@ -814,8 +814,10 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         scale_factors = tuple(meta['scale_factor'] for meta in img_metas)
 
         ms_bbox_result = {}
+        ms_cnt_bbox_result = {}
         ms_segm_result = {}
         ms_scores = []
+        ms_cnt_scores = []
         rcnn_test_cfg = self.test_cfg
 
         rois = bbox2roi(proposal_list)
@@ -844,6 +846,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             cnt_score = bbox_results['cnt_score']
             num_proposals_per_img = tuple(
                 len(proposals) for proposals in proposal_list)
+
             rois = rois.split(num_proposals_per_img, 0)
             cls_score = cls_score.split(num_proposals_per_img, 0)
             if isinstance(bbox_pred, torch.Tensor):
@@ -851,13 +854,21 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             else:
                 bbox_pred = self.bbox_head[i].bbox_pred_split(
                     bbox_pred, num_proposals_per_img)
+            cnt_score = cnt_score.split(num_proposals_per_img, 0)
+
             ms_scores.append(cls_score)
+            ms_cnt_scores.append(cnt_score)
 
             if i < self.num_stages - 1:
                 if self.bbox_head[i].custom_activation:
                     cls_score = [
                         self.bbox_head[i].loss_cls.get_activation(s)
                         for s in cls_score
+                    ]
+                if self.bbox_head[i].custom_cnt_activation:
+                    cnt_score = [
+                        self.bbox_head[i].loss_cnt.get_activation(s)
+                        for s in cnt_score
                     ]
                 refine_rois_list = []
                 for j in range(num_imgs):
@@ -871,7 +882,11 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         cls_score = [
             sum([score[i] for score in ms_scores]) / float(len(ms_scores))
             for i in range(num_imgs)
-        ]
+        ]       # Mean of 3 stages, for every image.
+        cnt_score = [
+            ms_cnt_scores[len(ms_cnt_scores) - 1][i]
+            for i in range(num_imgs)
+        ]       # Only save the value of last stage.
 
         det_bboxes = []
         det_labels = []
@@ -891,8 +906,8 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             det_counts.append(det_count) # 0529 add
 
         bbox_results = [
-            bbox2result(det_bboxes[i], det_labels[i], det_counts[i],  # 0530 add det_counts[i]
-                        self.bbox_head[-1].num_classes)
+            bbox2result_with_count(det_bboxes[i], det_labels[i], det_counts[i],
+                                   self.bbox_head[-1].num_classes, self.bbox_head[-1].num_counts)
             for i in range(num_imgs)
         ]
         ms_bbox_result['ensemble'] = bbox_results
@@ -957,7 +972,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
         rcnn_test_cfg = self.test_cfg
         aug_bboxes = []
         aug_scores = []
-        aug_cnt_scores = []                             # ADD
+        aug_cnt_scores = []                                         # ADD
         for x, img_meta in zip(features, img_metas):
             img_shape = img_meta[0]['img_shape']
             scale_factor = img_meta[0]['scale_factor']
@@ -967,7 +982,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
             proposals = bbox_mapping(proposal_list[0][:, :4], img_shape,
                                      scale_factor, flip, flip_direction)
             ms_scores = []
-            ms_cnt_scores = []                          # ADD
+            ms_cnt_scores = []                                      # ADD
 
             rois = bbox2roi([proposals])
 
@@ -993,7 +1008,7 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
                         img_meta[0])
 
             cls_score = sum(ms_scores) / float(len(ms_scores))
-            cnt_score = sum(ms_cnt_scores) / float(len(ms_cnt_scores))
+            cnt_score = ms_cnt_scores[len(ms_cnt_scores) - 1]
             bboxes, scores, cnt_scores = self.bbox_head[-1].get_bboxes(
                 rois,
                 cls_score,
@@ -1009,13 +1024,15 @@ class CascadeRoIHeadWithCount(CascadeRoIHead):
 
         merged_bboxes, merged_scores = merge_aug_bboxes(
             aug_bboxes, aug_scores, img_metas, rcnn_test_cfg)
-        det_bboxes, det_labels = multiclass_nms(merged_bboxes, merged_scores,
-                                                rcnn_test_cfg.score_thr,
-                                                rcnn_test_cfg.nms,
-                                                rcnn_test_cfg.max_per_img)
+        det_bboxes, det_labels, inds = multiclass_nms(merged_bboxes, merged_scores,
+                                                      rcnn_test_cfg.score_thr,
+                                                      rcnn_test_cfg.nms,
+                                                      rcnn_test_cfg.max_per_img,
+                                                      return_inds=True)
+        det_counts = aug_cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
 
-        bbox_result = bbox2result(det_bboxes, det_labels,
-                                  self.bbox_head[-1].num_classes)
+        bbox_result = bbox2result_with_count(det_bboxes, det_labels, det_counts,
+                                             self.bbox_head[-1].num_classes, self.bbox_head[-1].num_counts)
 
         if self.with_mask:
             if det_bboxes.shape[0] == 0:

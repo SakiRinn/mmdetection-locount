@@ -234,14 +234,16 @@ class CocoDataset(CustomDataset):
             img_id = self.img_ids[idx]
             result = results[idx]
             for label in range(len(result)):
-                bboxes = result[label]
-                for i in range(bboxes.shape[0]):
-                    data = dict()
-                    data['image_id'] = img_id
-                    data['bbox'] = self.xyxy2xywh(bboxes[i])
-                    data['score'] = float(bboxes[i][4])
-                    data['category_id'] = self.cat_ids[label]
-                    json_results.append(data)
+                for count in range(len(result[label])):
+                    bboxes = result[label][count]
+                    for i in range(bboxes.shape[0]):
+                        data = dict()
+                        data['image_id'] = img_id
+                        data['bbox'] = self.xyxy2xywh(bboxes[i])
+                        data['score'] = float(bboxes[i][4])
+                        data['category_id'] = self.cat_ids[label]
+                        data['count'] = count
+                        json_results.append(data)
         return json_results
 
     def _segm2json(self, results):
@@ -252,34 +254,37 @@ class CocoDataset(CustomDataset):
             img_id = self.img_ids[idx]
             det, seg = results[idx]
             for label in range(len(det)):
-                # bbox results
-                bboxes = det[label]
-                for i in range(bboxes.shape[0]):
-                    data = dict()
-                    data['image_id'] = img_id
-                    data['bbox'] = self.xyxy2xywh(bboxes[i])
-                    data['score'] = float(bboxes[i][4])
-                    data['category_id'] = self.cat_ids[label]
-                    bbox_json_results.append(data)
+                for count in range(len(det[label])):
+                    # bbox results
+                    bboxes = det[label][count]
+                    for i in range(bboxes.shape[0]):
+                        data = dict()
+                        data['image_id'] = img_id
+                        data['bbox'] = self.xyxy2xywh(bboxes[i][j])
+                        data['score'] = float(bboxes[i][4])
+                        data['category_id'] = self.cat_ids[label]
+                        data['count'] = count
+                        bbox_json_results.append(data)
 
-                # segm results
-                # some detectors use different scores for bbox and mask
-                if isinstance(seg, tuple):
-                    segms = seg[0][label]
-                    mask_score = seg[1][label]
-                else:
-                    segms = seg[label]
-                    mask_score = [bbox[4] for bbox in bboxes]
-                for i in range(bboxes.shape[0]):
-                    data = dict()
-                    data['image_id'] = img_id
-                    data['bbox'] = self.xyxy2xywh(bboxes[i])
-                    data['score'] = float(mask_score[i])
-                    data['category_id'] = self.cat_ids[label]
-                    if isinstance(segms[i]['counts'], bytes):
-                        segms[i]['counts'] = segms[i]['counts'].decode()
-                    data['segmentation'] = segms[i]
-                    segm_json_results.append(data)
+                    # segm results
+                    # some detectors use different scores for bbox and mask
+                    if isinstance(seg, tuple):
+                        segms = seg[0][label]
+                        mask_score = seg[1][label]
+                    else:
+                        segms = seg[label]
+                        mask_score = [bbox[4] for bbox in bboxes]
+                    for i in range(bboxes.shape[0]):
+                        data = dict()
+                        data['image_id'] = img_id
+                        data['bbox'] = self.xyxy2xywh(bboxes[i])
+                        data['score'] = float(mask_score[i])
+                        data['category_id'] = self.cat_ids[label]
+                        data['count'] = count
+                        if isinstance(segms[i]['counts'], bytes):
+                            segms[i]['counts'] = segms[i]['counts'].decode()
+                        data['segmentation'] = segms[i]
+                        segm_json_results.append(data)
         return bbox_json_results, segm_json_results
 
     def results2json(self, results, outfile_prefix):
