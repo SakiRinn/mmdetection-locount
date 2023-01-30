@@ -24,7 +24,7 @@ from .custom import CustomDataset
 class CocoDataset(CustomDataset):
 
     CLASSES = tuple(coco_classes())
-    COUNTS = 57
+    COUNTS = 56
 #     PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
 #                (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
 #                (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
@@ -262,8 +262,9 @@ class CocoDataset(CustomDataset):
                     for i in range(bboxes.shape[0]):
                         data = dict()
                         data['image_id'] = img_id
-                        data['bbox'] = self.xyxy2xywh(bboxes[i][j])
+                        data['bbox'] = self.xyxy2xywh(bboxes[i])
                         data['score'] = float(bboxes[i][4])
+                        data['cnt_score'] = float(bboxes[i][5])
                         data['category_id'] = self.cat_ids[label]
                         data['count'] = count
                         bbox_json_results.append(data)
@@ -281,6 +282,7 @@ class CocoDataset(CustomDataset):
                         data['image_id'] = img_id
                         data['bbox'] = self.xyxy2xywh(bboxes[i])
                         data['score'] = float(mask_score[i])
+                        data['cnt_score'] = float(bboxes[i][5])
                         data['category_id'] = self.cat_ids[label]
                         data['count'] = count
                         if isinstance(segms[i]['counts'], bytes):

@@ -7,7 +7,7 @@ from torch.nn.modules.utils import _pair
 
 from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms
 from mmdet.models.builder import HEADS, build_loss
-from mmdet.models.losses import accuracy
+from mmdet.models.losses import accuracy, cnt_accuracy
 from mmdet.models.utils import build_linear_layer
 
 import numpy as np
@@ -608,7 +608,7 @@ class BBoxHeadWithCount(BBoxHead):
                  roi_feat_size=7,
                  in_channels=256,
                  num_classes=80,
-                 num_counts=57,                                     # ADD
+                 num_counts=56,                                     # ADD
                  current_stage=0,
                  num_stages=0,
                  bbox_coder=dict(
@@ -714,9 +714,9 @@ class BBoxHeadWithCount(BBoxHead):
 
     @property
     def coarse_counts(self):
-        total_digits = math.ceil(math.log(self.num_counts))
-        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
-        return math.ceil(self.num_counts / interval)
+        num_digits = math.ceil(math.log(self.num_counts - 1, 2))        # e.g. 64 -> 7 digits, rather than 6.
+        stg_digits = math.ceil(num_digits / self.num_stages)
+        return 1 << (num_digits - (self.num_stages - self.current_stage - 1)*stg_digits)
 
     @property
     def custom_cnt_channels(self):
@@ -754,7 +754,7 @@ class BBoxHeadWithCount(BBoxHead):
                                      dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
         counts = pos_bboxes.new_full((num_samples, ),
-                                     self.num_counts - 1,       # CRITICAL: If not -1, cnt labels will overflow. (no background)
+                                     self.num_counts,       # count: be real.
                                      dtype=torch.long)
         count_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
@@ -883,11 +883,8 @@ class BBoxHeadWithCount(BBoxHead):
                     losses.update(loss_cnt_)
                 else:
                     losses['loss_cnt'] = loss_cnt_
-                if self.custom_cnt_activation:
-                    acc_cnt_ = self.loss_cnt.get_accuracy(cnt_score, counts)
-                    losses.update(acc_cnt_)
-                else:
-                    losses['acc_cnt'] = accuracy(cnt_score, counts)
+                if self.current_stage == self.num_stages - 1:
+                    losses['acc_cnt'] = torch.tensor(cnt_accuracy(cnt_score, counts, reduce_mean=True))
 
         return losses
 
@@ -960,10 +957,9 @@ class BBoxHeadWithCount(BBoxHead):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
 
-        total_digits = math.ceil(math.log(self.num_counts))
-        stage_digits = (total_digits % self.num_stages) if (self.current_stage == 0 and total_digits % self.num_stages != 0) \
-                        else math.ceil(total_digits / self.num_stages)
-        interval = 1 << ((self.num_stages - self.current_stage - 1) * math.ceil(total_digits / self.num_stages))
+        num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, 2)))     # e.g. 64 -> 7 digits, rather than 6.
+        stg_digits = math.ceil(num_digits / self.num_stages)
+        interval = 1 << ((self.num_stages - self.current_stage - 1)*stg_digits)
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
 
         new_counts = torch.floor(counts / interval).to(torch.long)

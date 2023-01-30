@@ -142,7 +142,7 @@ def bbox2result_with_count(bboxes, labels, counts, num_classes, num_counts):
             labels = labels.detach().cpu().numpy()
             counts = counts.detach().cpu().numpy()
         return [[bboxes[np.logical_and(counts == i, labels == j), :]
-                for i in range(num_counts)] for j in range(num_classes)]
+                for i in range(num_counts + 1)] for j in range(num_classes)]    # count: idx to real
 
 
 def distance2bbox(points, distance, max_shape=None):
