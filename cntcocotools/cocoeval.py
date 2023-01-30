@@ -372,7 +372,7 @@ class COCOeval:
                     t = np.where(iouThr == p.iouThrs)[0]
                     s = s[t]
                 s = s[:, :, :, aind, mind]
-            if len(s[s>-1])==0:
+            if len(s[s > -1])==0:
                 mean_s = -1
             else:
                 mean_s = np.mean(s[s > -1])

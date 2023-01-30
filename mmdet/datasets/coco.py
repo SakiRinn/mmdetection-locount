@@ -15,7 +15,7 @@ from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
 from mmdet.core.evaluation import coco_classes
-from .api_wrappers.cnt_coco_api import COCO, COCOeval
+from .api_wrappers.cnt_coco_api import COCO, COCOeval       # EDIT
 from .builder import DATASETS
 from .custom import CustomDataset
 

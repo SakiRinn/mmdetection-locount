@@ -123,7 +123,3 @@ python tools/train.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py
 ```sh
 python tools/test.py configs/locount/cascade_rcnn_r50_fpn_1x_locount.py work_dirs/cascade_rcnn_r50_fpn_1x_locount/latest.pth
 ```
-
-## TODO
-修改roi_heads，检查可复用性。
-检查metric的计算。
