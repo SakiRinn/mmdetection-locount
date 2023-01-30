@@ -930,9 +930,9 @@ class BBoxHeadWithCount(BBoxHead):
         # Determine the counts for all bboxes.
         if isinstance(cnt_scores, list):
             cnt_scores = sum(cnt_scores) / float(len(cnt_scores))
-        counts = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
-        argMax = torch.argmax(counts, dim=-1) + 1
-        counts = argMax.unsqueeze(-1).type(torch.long)     # Just one number.
+        cnt_scores = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
+        counts = torch.argmax(cnt_scores, dim=-1).unsqueeze(-1).type(torch.long)
+        cnt_scores = torch.max(cnt_scores, dim=-1)[0].unsqueeze(-1)
 
         if cfg is None:
             return bboxes, scores, cnt_scores
@@ -941,6 +941,8 @@ class BBoxHeadWithCount(BBoxHead):
                                                           cfg.score_thr, cfg.nms, cfg.max_per_img,
                                                           return_inds=True)
             det_counts = counts.expand(-1, self.num_classes).reshape(-1)[inds]
+            cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
+            det_bboxes = torch.cat([det_bboxes, cnt_scores.unsqueeze(-1)], -1)
             return det_bboxes, det_labels, det_counts
 
     def init_weights(self):

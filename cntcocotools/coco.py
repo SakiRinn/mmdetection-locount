@@ -24,7 +24,7 @@ def _isArrayLike(obj):
 class COCO:
 
     def __init__(self, annotation_file=None):
-        self.dataset,self.anns,self.cats,self.imgs,self.cnts = dict(),dict(),dict(),dict(),dict()
+        self.dataset, self.anns, self.cats, self.imgs = dict(), dict(), dict(), dict()
         self.imgToAnns, self.catToImgs, self.cntToImgs = defaultdict(list), defaultdict(list), defaultdict(list)
         if not annotation_file == None:
             print('loading annotations into memory...')
@@ -38,8 +38,8 @@ class COCO:
 
     def createIndex(self):
         print('creating index...')
-        anns, cats, imgs, cnts = {}, {}, {}, {}
-        imgToAnns,catToImgs = defaultdict(list),defaultdict(list)
+        anns, cats, imgs = {}, {}, {}
+        imgToAnns, catToImgs, cntToImgs = defaultdict(list), defaultdict(list), defaultdict(list)
         if 'annotations' in self.dataset:
             for ann in self.dataset['annotations']:
                 imgToAnns[ann['image_id']].append(ann)
@@ -53,22 +53,22 @@ class COCO:
             for cat in self.dataset['categories']:
                 cats[cat['id']] = cat
 
-        if 'counts' in self.dataset:
-            for cnt in self.dataset['counts']:
-                cnts[cnt['id']] = cnt
-
         if 'annotations' in self.dataset and 'categories' in self.dataset:
             for ann in self.dataset['annotations']:
                 catToImgs[ann['category_id']].append(ann['image_id'])
+
+        if 'annotations' in self.dataset:
+            for ann in self.dataset['annotations']:
+                cntToImgs[ann['count']].append(ann['image_id'])
 
         print('index created!')
 
         self.anns = anns
         self.imgToAnns = imgToAnns
         self.catToImgs = catToImgs
+        self.cntToImgs = cntToImgs
         self.imgs = imgs
         self.cats = cats
-        self.cnts = cnts
 
     def info(self):
         for key, value in self.dataset['info'].items():
@@ -144,9 +144,9 @@ class COCO:
 
     def loadCnts(self, ids=[]):
         if _isArrayLike(ids):
-            return [self.cnts[id] for id in ids]
+            return list(ids)
         elif type(ids) == int:
-            return [self.cnts[ids]]
+            return [ids]
 
     def loadImgs(self, ids=[]):
         if _isArrayLike(ids):
@@ -248,7 +248,6 @@ class COCO:
                 ann['id'] = id+1
         elif 'bbox' in anns[0] and not anns[0]['bbox'] == []:
             res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
-            res.dataset['counts'] = copy.deepcopy(self.dataset['counts'])
             for id, ann in enumerate(anns):
                 bb = ann['bbox']
                 x1, x2, y1, y2 = [bb[0], bb[0]+bb[2], bb[1], bb[1]+bb[3]]
@@ -259,7 +258,6 @@ class COCO:
                 ann['iscrowd'] = 0
         elif 'segmentation' in anns[0]:
             res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
-            res.dataset['counts'] = copy.deepcopy(self.dataset['counts'])
             for id, ann in enumerate(anns):
                 ann['area'] = maskUtils.area(ann['segmentation'])
                 if not 'bbox' in ann:
@@ -268,7 +266,6 @@ class COCO:
                 ann['iscrowd'] = 0
         elif 'keypoints' in anns[0]:
             res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
-            res.dataset['counts'] = copy.deepcopy(self.dataset['counts'])
             for id, ann in enumerate(anns):
                 s = ann['keypoints']
                 x = s[0::3]
