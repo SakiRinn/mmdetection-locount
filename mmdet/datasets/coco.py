@@ -15,7 +15,7 @@ from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
 from mmdet.core.evaluation import coco_classes
-from .api_wrappers import COCO, COCOeval
+from .api_wrappers.cnt_coco_api import COCO, COCOeval
 from .builder import DATASETS
 from .custom import CustomDataset
 
@@ -24,6 +24,7 @@ from .custom import CustomDataset
 class CocoDataset(CustomDataset):
 
     CLASSES = tuple(coco_classes())
+    COUNTS = 57
 #     PALETTE = [(220, 20, 60), (119, 11, 32), (0, 0, 142), (0, 0, 230),
 #                (106, 0, 228), (0, 60, 100), (0, 80, 100), (0, 0, 70),
 #                (0, 0, 192), (250, 170, 30), (100, 170, 30), (220, 220, 0),
@@ -241,6 +242,7 @@ class CocoDataset(CustomDataset):
                         data['image_id'] = img_id
                         data['bbox'] = self.xyxy2xywh(bboxes[i])
                         data['score'] = float(bboxes[i][4])
+                        data['cnt_score'] = float(bboxes[i][5])
                         data['category_id'] = self.cat_ids[label]
                         data['count'] = count
                         json_results.append(data)
@@ -476,7 +478,7 @@ class CocoDataset(CustomDataset):
                     level=logging.ERROR)
                 break
 
-            cocoEval = COCOeval(coco_gt, coco_det, iou_type)
+            cocoEval = COCOeval(coco_gt, coco_det, iou_type, counts=self.COUNTS)
             cocoEval.params.catIds = self.cat_ids
             cocoEval.params.imgIds = self.img_ids
             cocoEval.params.maxDets = list(proposal_nums)
@@ -633,6 +635,7 @@ class CocoDataset(CustomDataset):
 
         coco_gt = self.coco
         self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
+        self.cnt_ids = coco_gt.get_cnt_ids(max_count=self.COUNTS)
 
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,
