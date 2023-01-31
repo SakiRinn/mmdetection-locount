@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import mmcv
+import torch
 import torch.nn as nn
 
 
@@ -49,6 +50,27 @@ def accuracy(pred, target, topk=1, thresh=None):
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / pred.size(0)))
     return res[0] if return_single else res
+
+
+@mmcv.jit(coderize=True)
+def cnt_accuracy(pred, count, reduce_mean=False):
+    """Calculate counting accuracy (AC).
+
+    Args:
+        pred (torch.Tensor): The model prediction, shape (N, num_class)
+        count (torch.Tensor): The count target of each prediction, shape (N, )
+    """
+    if pred.size(0) == 0:
+        ac = pred.new_tensor(0.)
+        return ac
+    assert pred.ndim == 2 and count.ndim == 1
+    assert pred.size(0) == count.size(0)
+
+    pred_value, pred_count = pred.max(dim=1)
+    ac = (1 - torch.abs((pred_count - count) / count)).clamp(min=0)
+    if reduce_mean:
+        return ac.mean()
+    return ac
 
 
 class Accuracy(nn.Module):

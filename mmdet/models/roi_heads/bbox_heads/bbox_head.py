@@ -7,7 +7,7 @@ from torch.nn.modules.utils import _pair
 
 from mmdet.core import build_bbox_coder, multi_apply, multiclass_nms
 from mmdet.models.builder import HEADS, build_loss
-from mmdet.models.losses import accuracy
+from mmdet.models.losses import accuracy, cnt_accuracy
 from mmdet.models.utils import build_linear_layer
 
 import numpy as np
@@ -883,11 +883,8 @@ class BBoxHeadWithCount(BBoxHead):
                     losses.update(loss_cnt_)
                 else:
                     losses['loss_cnt'] = loss_cnt_
-                if self.custom_cnt_activation:
-                    acc_cnt_ = self.loss_cnt.get_accuracy(cnt_score, counts)
-                    losses.update(acc_cnt_)
-                else:
-                    losses['acc_cnt'] = accuracy(cnt_score, counts)
+                if self.current_stage == self.num_stages - 1:
+                    losses['acc_cnt'] = cnt_accuracy(cnt_score, counts, reduce_mean=True)
 
         return losses
 
@@ -931,7 +928,7 @@ class BBoxHeadWithCount(BBoxHead):
         if isinstance(cnt_scores, list):
             cnt_scores = sum(cnt_scores) / float(len(cnt_scores))
         cnt_scores = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
-        counts = torch.argmax(cnt_scores, dim=-1).unsqueeze(-1).type(torch.long)
+        counts = (torch.argmax(cnt_scores, dim=-1) - 1).unsqueeze(-1).type(torch.long)      # 1~counts -> 0~counts-1.
         cnt_scores = torch.max(cnt_scores, dim=-1)[0].unsqueeze(-1)
 
         if cfg is None:
