@@ -355,11 +355,13 @@ class COCOeval:
     def summarize(self):
         def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=100):
             p = self.params
-            iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
+            iStr = ' {:<18} {} @[ IoU={:<9} | AC={:<9} | area={:>6s} | maxDets={:>4d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
             typeStr = '(AP)' if ap==1 else '(AR)'
             iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
-                if iouThr is None else '{:0.2f}'.format(iouThr)
+                if iouThr is None else '{:0.2f}'.format(acThr)
+            acStr  = '{:0.2f}:{:0.2f}'.format(p.acThrs[0], p.acThrs[-1]) \
+                if acThr  is None else '{:0.2f}'.format(acThr)
 
             aind = [i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRng]
             mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
@@ -382,7 +384,7 @@ class COCOeval:
                 mean_s = -1
             else:
                 mean_s = np.mean(s[s > -1])
-            print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
+            print(iStr.format(titleStr, typeStr, iouStr, acStr, areaRng, maxDets, mean_s))
             return mean_s
 
         def _summarizeDets():
