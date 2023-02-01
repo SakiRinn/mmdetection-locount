@@ -112,7 +112,7 @@ class COCO:
         return ids
 
     def getCntIds(self, cntMax=0):
-        ids = list(range(cntMax))
+        ids = list(range(cntMax + 1))       # count: idx to real.
         return ids
 
     def getImgIds(self, imgIds=[], catIds=[]):

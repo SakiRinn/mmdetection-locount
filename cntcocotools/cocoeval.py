@@ -5,6 +5,7 @@ import datetime
 import time
 from collections import defaultdict
 from . import mask as maskUtils
+from mmdet.models.losses import cnt_accuracy
 import copy
 
 class COCOeval:
@@ -159,8 +160,8 @@ class COCOeval:
                     dy = yd - yg
                 else:
                     z = np.zeros((k))
-                    dx = np.max((z, x0-xd),axis=0)+np.max((z, xd-x1),axis=0)
-                    dy = np.max((z, y0-yd),axis=0)+np.max((z, yd-y1),axis=0)
+                    dx = np.max((z, x0 - xd), axis=0)+np.max((z, xd - x1), axis=0)
+                    dy = np.max((z, y0 - yd), axis=0)+np.max((z, yd - y1), axis=0)
                 e = (dx**2 + dy**2) / vars / (gt['area'] + np.spacing(1)) / 2
                 if k1 > 0:
                     e=e[vg > 0]
@@ -193,36 +194,45 @@ class COCOeval:
         ious = self.ious[imgId, catId][:, gtind] \
                if len(self.ious[imgId, catId]) > 0 else self.ious[imgId, catId]
 
-        T = len(p.iouThrs)
-        G = len(gt)
-        D = len(dt)
-        gtm  = np.zeros((T, G))
-        dtm  = np.zeros((T, D))
+        T  = len(p.iouThrs)
+        CT = len(p.acThrs)
+        G  = len(gt)
+        D  = len(dt)
+        gtm  = np.zeros((T, CT, G))
+        dtm  = np.zeros((T, CT, D))
         gtIg = np.array([g['_ignore'] for g in gt])
-        dtIg = np.zeros((T, D))
+        dtIg = np.zeros((T, CT, D))
 
         if not len(ious) == 0:
             for tind, t in enumerate(p.iouThrs):
-                for dind, d in enumerate(dt):
-                    iou = min([t, 1-1e-10])
-                    m   = -1
-                    for gind, g in enumerate(gt):
-                        if gtm[tind, gind] > 0 and not iscrowd[gind]:
-                            continue
-                        if m > -1 and gtIg[m] == 0 and gtIg[gind] == 1:
-                            break
-                        if ious[dind, gind] < iou:
-                            continue
-                        iou = ious[dind, gind]
-                        m = gind
-                    if m == -1:
-                        continue
-                    dtIg[tind, dind] = gtIg[m]
-                    dtm[tind, dind]  = gt[m]['id']
-                    gtm[tind, m]     = d['id']
+                for ctind, ct in enumerate(p.acThrs):
+                    for dind, d in enumerate(dt):
 
-        a = np.array([d['area'] < aRng[0] or d['area'] > aRng[1] for d in dt]).reshape((1, len(dt)))
-        dtIg = np.logical_or(dtIg, np.logical_and(dtm == 0, np.repeat(a, T, 0)))
+                        iou = min([t , 1 - 1e-10])
+                        ac  = min([ct, 1 - 1e-10])
+                        m   = -1
+                        for gind, g in enumerate(gt):
+                            acs = cnt_accuracy(np.array(d['count']).reshape(1),
+                                               np.array(g['count']).reshape(1))
+                            if gtm[tind, ctind, gind] > 0 and not iscrowd[gind]:
+                                continue
+                            if m > -1 and gtIg[m] == 0 and gtIg[gind] == 1:
+                                break
+                            if ious[dind, gind] < iou:
+                                continue
+                            if acs < ac:
+                                continue
+                            iou = ious[dind, gind]
+                            ac  = acs
+                            m   = gind
+                        if m == -1:
+                            continue
+                        dtIg[tind, ctind, dind] = gtIg[m]
+                        dtm[tind, ctind, dind]  = gt[m]['id']
+                        gtm[tind, ctind, m]     = d['id']
+
+        a = np.array([d['area'] < aRng[0] or d['area'] > aRng[1] for d in dt])
+        dtIg = np.logical_or(dtIg, np.logical_and(dtm == 0, np.broadcast_to(a, [T, CT, len(dt)])))
 
         return {
                 'image_id':     imgId,
@@ -234,46 +244,44 @@ class COCOeval:
                 'dtMatches':    dtm,
                 'gtMatches':    gtm,
                 'dtScores':     [d['score'] for d in dt],
+                'dtCntScores':  [d['cnt_score'] for d in dt],
                 'gtIgnore':     gtIg,
                 'dtIgnore':     dtIg,
             }
-
-    def evaluateCnt(self, imgId, cntId, cntRng, maxDet):
-        ...
 
     def accumulate(self, p = None):
         print('Accumulating evaluation results...')
         tic = time.time()
         if not self.evalImgs:
             print('Please run evaluate() first')
-        # allows input customized parameters
+
         if p is None:
             p = self.params
         p.catIds = p.catIds if p.useCats == 1 else [-1]
         T           = len(p.iouThrs)
+        CT          = len(p.acThrs)
         R           = len(p.recThrs)
         K           = len(p.catIds) if p.useCats else 1
         A           = len(p.areaRng)
         M           = len(p.maxDets)
-        precision   = -np.ones((T, R, K, A, M)) # -1 for the precision of absent categories
-        recall      = -np.ones((T, K, A, M))
-        scores      = -np.ones((T, R, K, A, M))
+        precision   = -np.ones((T*CT, R, K, A, M))  # -1 for the precision of absent categories
+        recall      = -np.ones((T*CT, K, A, M))
+        scores      = -np.ones((T*CT, R, K, A, M))
 
-        # create dictionary for future indexing
         _pe = self._paramsEval
         catIds = _pe.catIds if _pe.useCats else [-1]
         setK = set(catIds)
         setA = set(map(tuple, _pe.areaRng))
         setM = set(_pe.maxDets)
         setI = set(_pe.imgIds)
-        # get inds to evaluate
+
         k_list = [n for n, k in enumerate(p.catIds)  if k in setK]
         m_list = [m for n, m in enumerate(p.maxDets) if m in setM]
         i_list = [n for n, i in enumerate(p.imgIds)  if i in setI]
         a_list = [n for n, a in enumerate(map(lambda x: tuple(x), p.areaRng)) if a in setA]
         I0 = len(_pe.imgIds)
         A0 = len(_pe.areaRng)
-        # retrieve E at each category, area range, and max number of detections
+
         for k, k0 in enumerate(k_list):
             Nk = k0*A0*I0
             for a, a0 in enumerate(a_list):
@@ -284,24 +292,22 @@ class COCOeval:
                     if len(E) == 0:
                         continue
                     dtScores = np.concatenate([e['dtScores'][0:maxDet] for e in E])
-
-                    # different sorting method generates slightly different results.
-                    # mergesort is used to be consistent as Matlab implementation.
                     inds = np.argsort(-dtScores, kind='mergesort')
                     dtScoresSorted = dtScores[inds]
 
-                    dtm  = np.concatenate([e['dtMatches'][:,0:maxDet] for e in E], axis=1)[:, inds]
-                    dtIg = np.concatenate([e['dtIgnore'][:,0:maxDet]  for e in E], axis=1)[:, inds]
+                    dtm  = np.concatenate([e['dtMatches'][:, :, 0:maxDet] for e in E], axis=-1)[:, :, inds]
+                    dtIg = np.concatenate([e['dtIgnore'][:, :, 0:maxDet]  for e in E], axis=-1)[:, :, inds]
                     gtIg = np.concatenate([e['gtIgnore'] for e in E])
                     npig = np.count_nonzero(gtIg == 0)
+
                     if npig == 0:
                         continue
-                    tps = np.logical_and(               dtm , np.logical_not(dtIg))
-                    fps = np.logical_and(np.logical_not(dtm), np.logical_not(dtIg))
+                    tps = np.logical_and(               dtm , np.logical_not(dtIg)).reshape(-1, dtm.shape[-1])
+                    fps = np.logical_and(np.logical_not(dtm), np.logical_not(dtIg)).reshape(-1, dtm.shape[-1])
+                    tp_sum = np.cumsum(tps, axis=-1).astype(dtype=np.float)
+                    fp_sum = np.cumsum(fps, axis=-1).astype(dtype=np.float)
 
-                    tp_sum = np.cumsum(tps, axis=1).astype(dtype=np.float)
-                    fp_sum = np.cumsum(fps, axis=1).astype(dtype=np.float)
-                    for t, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
+                    for t_ct, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
                         tp = np.array(tp)
                         fp = np.array(fp)
                         nd = len(tp)
@@ -311,12 +317,10 @@ class COCOeval:
                         ss = np.zeros((R, ))
 
                         if nd:
-                            recall[t, k, a, m] = rc[-1]
+                            recall[t_ct, k, a, m] = rc[-1]
                         else:
-                            recall[t, k, a, m] = 0
+                            recall[t_ct, k, a, m] = 0
 
-                        # numpy is slow without cython optimization for accessing elements
-                        # use python array gets significant speed improvement
                         pr = pr.tolist(); q = q.tolist()
 
                         for i in range(nd - 1, 0, -1):
@@ -330,11 +334,16 @@ class COCOeval:
                                 ss[ri] = dtScoresSorted[pi]
                         except:
                             pass
-                        precision[t, :, k, a, m] = np.array(q)
-                        scores[t, :, k, a, m] = np.array(ss)
+                        precision[t_ct, :, k, a, m] = np.array(q)
+                        scores[t_ct, :, k, a, m] = np.array(ss)
+
+        precision   = precision.reshape((T, CT, R, K, A, M))
+        recall      = recall.reshape((T, CT, K, A, M))
+        scores      = scores.reshape((T, CT, R, K, A, M))
+
         self.eval = {
             'params': p,
-            'counts': [T, R, K, A, M],
+            'counts': [T, CT, R, K, A, M],
             'date': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'precision': precision,
             'recall': recall,
@@ -344,7 +353,7 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc - tic))
 
     def summarize(self):
-        def _summarize( ap=1, iouThr=None, areaRng='all', maxDets=100 ):
+        def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=100):
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
@@ -358,7 +367,10 @@ class COCOeval:
                 s = self.eval['precision']
                 if iouThr is not None:
                     t = np.where(iouThr == p.iouThrs)[0]
-                    s = s[t]
+                    s = s[t, ...]
+                if acThr is not None:
+                    ct = np.where(acThr == p.acThrs)[0]
+                    s = s[:, ct, ...]
                 s = s[:, :, :, :, aind, mind]
             else:
                 s = self.eval['recall']
@@ -376,8 +388,8 @@ class COCOeval:
         def _summarizeDets():
             stats = np.zeros((12,))
             stats[0] = _summarize(1)
-            stats[1] = _summarize(1, iouThr=.5, maxDets=self.params.maxDets[2])
-            stats[2] = _summarize(1, iouThr=.75, maxDets=self.params.maxDets[2])
+            stats[1] = _summarize(1, iouThr=.5, acThr=.5, maxDets=self.params.maxDets[2])
+            stats[2] = _summarize(1, iouThr=.75, acThr=.75, maxDets=self.params.maxDets[2])
             stats[3] = _summarize(1, areaRng='small', maxDets=self.params.maxDets[2])
             stats[4] = _summarize(1, areaRng='medium', maxDets=self.params.maxDets[2])
             stats[5] = _summarize(1, areaRng='large', maxDets=self.params.maxDets[2])
@@ -427,7 +439,7 @@ class Params:
         self.maxDets = [1, 10, 100]
         self.areaRng = [[0**2, 1e5**2], [0**2, 150**2], [150**2, 300**2], [300** 2, 1e5**2]]        # EDIT
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
-        self.cntRng = [[1, 1e5], [0, 1], [2, 10], [10, 1e5]]                                        # ADD
+        self.cntRng = [[0, 1e5], [0, 1], [2, 10], [11, 1e5]]                                        # ADD
         self.cntRngLbl = ['all', 'individual', 'medium', 'large']                                   # ADD
         self.useCats = 1
         self.useCnts = 1
@@ -442,7 +454,7 @@ class Params:
         self.maxDets = [20]
         self.areaRng = [[0**2, 1e5**2], [0**2, 150**2], [150**2, 300**2], [300** 2, 1e5**2]]        # EDIT
         self.areaRngLbl = ['all', 'medium', 'large']
-        self.cntRng = [[1, 1e5], [1, 1], [2, 10], [10, 1e5]]                                        # ADD
+        self.cntRng = [[0, 1e5], [0, 1], [2, 10], [11, 1e5]]                                        # ADD
         self.cntRngLbl = ['all', 'individual', 'medium', 'large']                                   # ADD
         self.useCats = 1
         self.useCnts = 1

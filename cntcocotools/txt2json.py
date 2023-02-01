@@ -40,7 +40,7 @@ def rle2area(rle):
 def txt2json(dir, json_path='ann_file'):
     images = []
     annotations = []
-    categories = [{'id': i, 'name': cat} for i, cat in enumerate(coco_classes())]
+    categories = [{'id': i + 1, 'name': cat} for i, cat in enumerate(coco_classes())]
 
     txts = [name for name in os.listdir(dir) if re.match(r'^\d+\.txt$', name) is not None]
     for txt in txts:
@@ -64,7 +64,7 @@ def txt2json(dir, json_path='ann_file'):
                 x1, y1, x2, y2 = [int(n) for n in seg[:4]]
 
                 annotations.append(dict(
-                    id=len(annotations),
+                    id=len(annotations) + 1,
                     image_id=img_id,
                     category_id=cls_id,
                     bbox=[x1, y1, x2-x1, y2-y1],

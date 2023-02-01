@@ -608,7 +608,7 @@ class BBoxHeadWithCount(BBoxHead):
                  roi_feat_size=7,
                  in_channels=256,
                  num_classes=80,
-                 num_counts=57,                                     # ADD
+                 num_counts=56,                                     # ADD
                  current_stage=0,
                  num_stages=0,
                  bbox_coder=dict(
@@ -714,7 +714,7 @@ class BBoxHeadWithCount(BBoxHead):
 
     @property
     def coarse_counts(self):
-        num_digits = math.ceil(math.log(self.num_counts, 2))
+        num_digits = math.ceil(math.log(self.num_counts - 1, 2))        # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         return 1 << (num_digits - (self.num_stages - self.current_stage - 1)*stg_digits)
 
@@ -754,7 +754,7 @@ class BBoxHeadWithCount(BBoxHead):
                                      dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
         counts = pos_bboxes.new_full((num_samples, ),
-                                     self.num_counts - 1,       # CRITICAL: If not -1, cnt labels will overflow. (no background)
+                                     self.num_counts,       # count: be real.
                                      dtype=torch.long)
         count_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
@@ -884,7 +884,7 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
-                    losses['acc_cnt'] = cnt_accuracy(cnt_score, counts, reduce_mean=True)
+                    losses['acc_cnt'] = torch.tensor(cnt_accuracy(cnt_score, counts, reduce_mean=True))
 
         return losses
 
@@ -928,7 +928,7 @@ class BBoxHeadWithCount(BBoxHead):
         if isinstance(cnt_scores, list):
             cnt_scores = sum(cnt_scores) / float(len(cnt_scores))
         cnt_scores = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
-        counts = (torch.argmax(cnt_scores, dim=-1) - 1).unsqueeze(-1).type(torch.long)      # 1~counts -> 0~counts-1.
+        counts = torch.argmax(cnt_scores, dim=-1).unsqueeze(-1).type(torch.long)
         cnt_scores = torch.max(cnt_scores, dim=-1)[0].unsqueeze(-1)
 
         if cfg is None:
@@ -957,7 +957,7 @@ class BBoxHeadWithCount(BBoxHead):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
 
-        num_digits = math.ceil(math.ceil(math.log(self.num_counts, 2)))
+        num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, 2)))     # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         interval = 1 << ((self.num_stages - self.current_stage - 1)*stg_digits)
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.

@@ -591,13 +591,12 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
             self.cls_out_channels = num_classes
         else:
             self.cls_out_channels = num_classes + 1
-        # self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)
-        # self.cnt_out_channels = num_counts
+        self.cnt_out_channels = num_counts + 1
 
         if self.cls_out_channels <= 0:
             raise ValueError(f'num_classes={num_classes} is too small')
-        # if self.cnt_out_channels <= 0:
-        #     raise ValueError(f'num_counts={num_counts} is too small')
+        if self.cnt_out_channels <= 0:
+            raise ValueError(f'num_counts={num_counts} is too small')
         self.reg_decoded_bbox = reg_decoded_bbox
 
         self.bbox_coder = build_bbox_coder(bbox_coder)
@@ -806,7 +805,7 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
         anchor_list, valid_flag_list = self.get_anchors(
             featmap_sizes, img_metas, device=device)
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
-        # count_channels = self.cnt_out_channels if self.use_sigmoid_cnt else 1
+        count_channels = self.cnt_out_channels
         cls_reg_cnt_targets = self.get_targets(
             anchor_list,
             valid_flag_list,
@@ -816,7 +815,7 @@ class AnchorHeadWithCount(AnchorHead, BaseDenseHeadWithCount):
             gt_labels_list=gt_labels,
             gt_counts_list=gt_counts,
             label_channels=label_channels,
-            count_channels=self.num_counts)     # count_channels?
+            count_channels=count_channels)     # count_channels?
         if cls_reg_cnt_targets is None:
             return None
 
