@@ -54,7 +54,7 @@ def accuracy(pred, target, topk=1, thresh=None):
 
 
 @mmcv.jit(coderize=True)
-def cnt_accuracy(pred, count, reduce_mean=False):
+def cnt_accuracy(pred, count, reduce_mean=True):
     """Calculate counting accuracy (AC).
 
     Args:

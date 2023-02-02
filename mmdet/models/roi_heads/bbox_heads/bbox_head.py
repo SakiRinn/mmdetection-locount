@@ -607,10 +607,10 @@ class BBoxHeadWithCount(BBoxHead):
                  with_cnt=True,                                     # ADD
                  roi_feat_size=7,
                  in_channels=256,
-                 num_classes=80,
+                 num_classes=140,
                  num_counts=56,                                     # ADD
                  current_stage=0,
-                 num_stages=0,
+                 num_stages=1,
                  bbox_coder=dict(
                      type='DeltaXYWHBBoxCoder',
                      clip_border=True,
