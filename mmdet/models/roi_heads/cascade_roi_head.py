@@ -9,7 +9,7 @@ from mmdet.core import (bbox2result, bbox2roi, bbox_mapping, build_assigner,
                         multiclass_nms, bbox2result_with_count)
 from ..builder import HEADS, build_head, build_roi_extractor
 from .base_roi_head import BaseRoIHead
-from .test_mixins import BBoxTestMixin, MaskTestMixin
+from .test_mixins import BBoxTestMixin, MaskTestMixin, BBoxTestMixinWithCount
 
 
 @HEADS.register_module()
@@ -632,7 +632,7 @@ class CascadeRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
 
 
 @HEADS.register_module()
-class CascadeRoIHeadWithCount(CascadeRoIHead):
+class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
 
     def __init__(self,
                  num_stages,

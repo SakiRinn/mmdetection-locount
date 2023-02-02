@@ -1,6 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import mmcv
-import numpy as np
 import torch
 import torch.nn as nn
 
@@ -52,38 +51,45 @@ def accuracy(pred, target, topk=1, thresh=None):
         res.append(correct_k.mul_(100.0 / pred.size(0)))
     return res[0] if return_single else res
 
-
 @mmcv.jit(coderize=True)
-def cnt_accuracy(pred, count, reduce_mean=False):
+def cnt_accuracy(pred, count, reduce_mean=True):
     """Calculate counting accuracy (AC).
 
     Args:
-        pred (torch.Tensor | np.ndarray): The model prediction,
-        shape (N, num_class) or (N, ).
-        count (torch.Tensor | np.ndarray): The count target of each prediction,
-        shape (N, ).
+        pred (torch.Tensor): The model prediction, shape (N, num_class) or (N, ).
+        count (torch.Tensor): The count target of each prediction, shape (N, ).
 
     Returns:
         float | np.ndarray
     """
-    if isinstance(pred, torch.Tensor):
-        pred = pred.cpu().detach().numpy()
-    if isinstance(count, torch.Tensor):
-        count = count.cpu().detach().numpy()
-    if pred.shape[0] == 0:
-        ac = np.zeros_like(pred)
+    if pred.size(0) == 0:
+        ac = pred.new_tensor(0.)
         return ac
-    assert count.ndim == 1
-    assert pred.shape[0] == count.shape[0]
+    assert pred.ndim <=2 and count.ndim == 1
+    assert pred.size(0) == count.size(0)
 
     if pred.ndim == 2:
-        pred_count = pred.argmax(axis=1)
+        _, pred_count = pred.max(dim=1)
     else:
         pred_count = pred
-    ac = (1 - np.abs(pred_count - count) / count).clip(min=0)
+    ac = (1 - torch.abs(pred_count - count) / count).clamp(min=0)
     if reduce_mean:
         return ac.mean()
     return ac
+
+def single_cnt_accuracy(pred_count, count):
+    """Calculate counting accuracy (AC) for a single number.
+       Using native python.
+
+    Args:
+        pred (int): The model prediction.
+        count (int): The count target of each prediction.
+
+    Returns:
+        float
+    """
+    assert isinstance(pred_count, int) and isinstance(count, int)
+    return max(.0, 1.0 - abs(pred_count - count) / count)
 
 
 class Accuracy(nn.Module):

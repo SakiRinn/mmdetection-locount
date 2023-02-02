@@ -607,10 +607,10 @@ class BBoxHeadWithCount(BBoxHead):
                  with_cnt=True,                                     # ADD
                  roi_feat_size=7,
                  in_channels=256,
-                 num_classes=80,
+                 num_classes=140,
                  num_counts=56,                                     # ADD
                  current_stage=0,
-                 num_stages=0,
+                 num_stages=1,
                  bbox_coder=dict(
                      type='DeltaXYWHBBoxCoder',
                      clip_border=True,
@@ -884,7 +884,7 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
-                    losses['acc_cnt'] = torch.tensor(cnt_accuracy(cnt_score, counts, reduce_mean=True))
+                    losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
 
         return losses
 
