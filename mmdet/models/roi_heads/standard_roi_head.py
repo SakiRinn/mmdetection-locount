@@ -1,10 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
 
-from mmdet.core import bbox2result, bbox2roi, build_assigner, build_sampler
+from mmdet.core import bbox2result, bbox2roi, build_assigner, build_sampler, bbox2result_with_count
 from ..builder import HEADS, build_head, build_roi_extractor
 from .base_roi_head import BaseRoIHead
-from .test_mixins import BBoxTestMixin, MaskTestMixin
+from .test_mixins import BBoxTestMixin, MaskTestMixin, BBoxTestMixinWithCount
 
 
 @HEADS.register_module()
@@ -395,3 +395,164 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
             rois, cls_score, bbox_pred, img_shapes, cfg=rcnn_test_cfg)
 
         return det_bboxes, det_labels
+
+
+@HEADS.register_module()
+class StandardRoIHeadWithCount(BBoxTestMixinWithCount, StandardRoIHead):
+
+    def forward_dummy(self, x, proposals):
+        # bbox head
+        outs = ()
+        rois = bbox2roi([proposals])
+        if self.with_bbox:
+            bbox_results = self._bbox_forward(x, rois)
+            outs = outs + (bbox_results['cls_score'],
+                           bbox_results['bbox_pred'],
+                           bbox_results['cnt_score'])
+        # mask head
+        if self.with_mask:
+            mask_rois = rois[:100]
+            mask_results = self._mask_forward(x, mask_rois)
+            outs = outs + (mask_results['mask_pred'], )
+        return outs
+
+    def forward_train(self,
+                      x,
+                      img_metas,
+                      proposal_list,
+                      gt_bboxes,
+                      gt_labels,
+                      gt_counts,
+                      gt_bboxes_ignore=None,
+                      gt_masks=None,
+                      **kwargs):
+        if self.with_bbox or self.with_mask:
+            num_imgs = len(img_metas)
+            if gt_bboxes_ignore is None:
+                gt_bboxes_ignore = [None for _ in range(num_imgs)]
+            sampling_results = []
+            for i in range(num_imgs):
+                assign_result = self.bbox_assigner.assign(
+                    proposal_list[i], gt_bboxes[i], gt_bboxes_ignore[i],
+                    gt_labels[i], gt_counts[i])
+                sampling_result = self.bbox_sampler.sample(
+                    assign_result,
+                    proposal_list[i],
+                    gt_bboxes[i],
+                    gt_labels[i],
+                    gt_counts[i],
+                    feats=[lvl_feat[i][None] for lvl_feat in x])
+                sampling_results.append(sampling_result)
+
+        losses = dict()
+        # bbox head forward and loss
+        if self.with_bbox:
+            bbox_results = self._bbox_forward_train(x, sampling_results,
+                                                    gt_bboxes, gt_labels, gt_counts,
+                                                    img_metas)
+            losses.update(bbox_results['loss_bbox'])
+        # mask head forward and loss
+        if self.with_mask:
+            mask_results = self._mask_forward_train(x, sampling_results,
+                                                    bbox_results['bbox_feats'],
+                                                    gt_masks, img_metas)
+            losses.update(mask_results['loss_mask'])
+
+        return losses
+
+    def _bbox_forward(self, x, rois):
+        bbox_feats = self.bbox_roi_extractor(
+            x[:self.bbox_roi_extractor.num_inputs], rois)
+        if self.with_shared_head:
+            bbox_feats = self.shared_head(bbox_feats)
+        cls_score, bbox_pred, cnt_score = self.bbox_head(bbox_feats)
+
+        bbox_results = dict(
+            cls_score=cls_score, bbox_pred=bbox_pred, bbox_feats=bbox_feats, cnt_score=cnt_score)
+        return bbox_results
+
+    def _bbox_forward_train(self, x, sampling_results, gt_bboxes, gt_labels, gt_counts, img_metas):
+        rois = bbox2roi([res.bboxes for res in sampling_results])
+        bbox_results = self._bbox_forward(x, rois)
+        bbox_targets = self.bbox_head.get_targets(sampling_results,
+                                                  gt_bboxes,
+                                                  gt_labels,
+                                                  gt_counts,
+                                                  self.train_cfg)
+        loss_bbox = self.bbox_head.loss(bbox_results['cls_score'],
+                                        bbox_results['bbox_pred'],
+                                        bbox_results['cnt_score'],
+                                        rois,
+                                        *bbox_targets)
+
+        bbox_results.update(loss_bbox=loss_bbox)
+        return bbox_results
+
+    async def async_simple_test(self,
+                                x,
+                                proposal_list,
+                                img_metas,
+                                proposals=None,
+                                rescale=False):
+        """Async test without augmentation."""
+        assert self.with_bbox, 'Bbox head must be implemented.'
+
+        det_bboxes, det_labels = await self.async_test_bboxes(
+            x, img_metas, proposal_list, self.test_cfg, rescale=rescale)
+        bbox_results = bbox2result(det_bboxes, det_labels,
+                                   self.bbox_head.num_classes)
+        if not self.with_mask:
+            return bbox_results
+        else:
+            segm_results = await self.async_test_mask(
+                x,
+                img_metas,
+                det_bboxes,
+                det_labels,
+                rescale=rescale,
+                mask_test_cfg=self.test_cfg.get('mask'))
+            return bbox_results, segm_results
+
+    def simple_test(self,
+                    x,
+                    proposal_list,
+                    img_metas,
+                    proposals=None,
+                    rescale=False):
+        assert self.with_bbox, 'Bbox head must be implemented.'
+
+        det_bboxes, det_labels, det_counts = self.simple_test_bboxes(
+            x, img_metas, proposal_list, self.test_cfg, rescale=rescale)
+
+        bbox_results = [
+            bbox2result_with_count(det_bboxes[i], det_labels[i], det_counts[i],
+                                   self.bbox_head.num_classes, self.bbox_head.num_counts)
+            for i in range(len(det_bboxes))
+        ]
+
+        if not self.with_mask:
+            return bbox_results
+        else:
+            segm_results = self.simple_test_mask(
+                x, img_metas, det_bboxes, det_labels, rescale=rescale)
+            return list(zip(bbox_results, segm_results))
+
+    def aug_test(self, x, proposal_list, img_metas, rescale=False):
+        det_bboxes, det_labels, det_counts = self.aug_test_bboxes(
+            x, img_metas, proposal_list, self.test_cfg)
+
+        if rescale:
+            _det_bboxes = det_bboxes
+        else:
+            _det_bboxes = det_bboxes.clone()
+            _det_bboxes[:, :4] *= det_bboxes.new_tensor(
+                img_metas[0][0]['scale_factor'])
+
+        bbox_results = bbox2result_with_count(_det_bboxes, det_labels, det_counts,
+                                              self.bbox_head.num_classes, self.bbox_head.num_counts)
+
+        if self.with_mask:
+            segm_results = self.aug_test_mask(x, img_metas, det_bboxes, det_labels)     # TODO: add `det_counts` in MaskTestMixin.
+            return [(bbox_results, segm_results)]
+        else:
+            return [bbox_results]

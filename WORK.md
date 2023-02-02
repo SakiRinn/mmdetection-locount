@@ -39,7 +39,9 @@
   **基类**。添加`TwoStageDetectorWithCount`类。\
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
 * `mmdet/models/detectors/cascade_rcnn.py`\
-  添加`CascadeRCNNWithCount`类，具体同上。
+  添加`CascadeRCNNWithCount`类，仅修改了基类。
+* `mmdet/models/detectors/faster_rcnn.py`
+  添加`FasterRCNNWithCount`类，仅修改了基类。
 
 ### `models/dense_heads`部分
 已完工，可复用，基本无修改。
@@ -58,10 +60,14 @@
 * `mmdet/models/roi_heads/bbox_heads/bbox_head.py`\
   **基类**。添加`BBoxHeadWithCount`类。\
   实现了随stage数count预测从模糊到精确的过程，具体为`div_counts`函数和`coarse_counts`属性（替代原`num_counts`）。
+* `mmdet/models/roi_heads/test_mixins.py`\
+  **基类**。添加`BBoxTestMixinWithCount`类，为RoI Head的派生类提供test相关方法。
 * `mmdet/models/roi_heads/bbox_heads/convfc_bbox_head.py`\
   添加`FCBBoxHeadWithCount`类，具体添加了一个cnt头。
 * `mmdet/models/roi_heads/cascade_roi_head.py`\
-  添加`CascadeRoIHeadWithCount`类，具体添加了cnt相关部分。
+  添加`CascadeRoIHeadWithCount`类。
+* `mmdet/models/roi_heads/standard_roi_head.py`\
+  添加`StandardRoIHeadWithCount`类。
 
 
 ## 数据采样
@@ -95,10 +101,10 @@
 该部分修改主要在`configs/`下进行。
 * `configs/_base_/datasets/coco_LHC.py`\
   **新文件**。用于处理Locount数据集。
-* `configs/_base_/models/cascade_rcnn_r50_fpn_locount.py`\
-  **新文件**。用于初始化Locount网络结构。
-* `configs/locount/cascade_rcnn_r50_fpn_1x_locount.py`\
-  **新文件**。用于整合。
+* `configs/_base_/models/*_locount.py`\
+  **新文件**。用于初始化Locount网络结构。（多个文件）
+* `configs/locount/`\
+  **新文件夹**。用于整合locount配置。
 
 # 备注
 ## 生成数据集配置
