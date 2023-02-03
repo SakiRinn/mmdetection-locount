@@ -5,7 +5,7 @@ import datetime
 import time
 from collections import defaultdict
 from . import mask as maskUtils
-from mmdet.models.losses import cnt_accuracy
+from mmdet.models.losses import single_cnt_accuracy
 import copy
 
 class COCOeval:
@@ -212,8 +212,7 @@ class COCOeval:
                         ac  = min([ct, 1 - 1e-10])
                         m   = -1
                         for gind, g in enumerate(gt):
-                            acs = cnt_accuracy(np.array(d['count']).reshape(1),
-                                               np.array(g['count']).reshape(1))
+                            acs = single_cnt_accuracy(d['count'], g['count'])
                             if gtm[tind, ctind, gind] > 0 and not iscrowd[gind]:
                                 continue
                             if m > -1 and gtIg[m] == 0 and gtIg[gind] == 1:
@@ -264,9 +263,9 @@ class COCOeval:
         K           = len(p.catIds) if p.useCats else 1
         A           = len(p.areaRng)
         M           = len(p.maxDets)
-        precision   = -np.ones((T*CT, R, K, A, M))  # -1 for the precision of absent categories
-        recall      = -np.ones((T*CT, K, A, M))
-        scores      = -np.ones((T*CT, R, K, A, M))
+        precision   = -np.ones((T, CT, R, K, A, M)) # -1 for the precision of absent categories
+        recall      = -np.ones((T, CT, K, A, M))
+        scores      = -np.ones((T, CT, R, K, A, M))
 
         _pe = self._paramsEval
         catIds = _pe.catIds if _pe.useCats else [-1]
@@ -302,44 +301,42 @@ class COCOeval:
 
                     if npig == 0:
                         continue
-                    tps = np.logical_and(               dtm , np.logical_not(dtIg)).reshape(-1, dtm.shape[-1])
-                    fps = np.logical_and(np.logical_not(dtm), np.logical_not(dtIg)).reshape(-1, dtm.shape[-1])
+                    tps = np.logical_and(               dtm , np.logical_not(dtIg))
+                    fps = np.logical_and(np.logical_not(dtm), np.logical_not(dtIg))
                     tp_sum = np.cumsum(tps, axis=-1).astype(dtype=np.float)
                     fp_sum = np.cumsum(fps, axis=-1).astype(dtype=np.float)
 
-                    for t_ct, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
-                        tp = np.array(tp)
-                        fp = np.array(fp)
-                        nd = len(tp)
-                        rc = tp / npig
-                        pr = tp / (fp + tp + np.spacing(1))
-                        q  = np.zeros((R, ))
-                        ss = np.zeros((R, ))
+                    assert tp_sum.shape[:-1] == fp_sum.shape[:-1]
+                    for t in range(tp_sum.shape[0]):
+                        for ct in range(tp_sum.shape[1]):
+                            tp = np.array(tp_sum[t, ct])
+                            fp = np.array(fp_sum[t, ct])
+                            nd = len(tp)
+                            rc = tp / npig
+                            pr = tp / (fp + tp + np.spacing(1))
+                            q  = np.zeros((R, ))
+                            ss = np.zeros((R, ))
 
-                        if nd:
-                            recall[t_ct, k, a, m] = rc[-1]
-                        else:
-                            recall[t_ct, k, a, m] = 0
+                            if nd:
+                                recall[t, ct, k, a, m] = rc[-1]
+                            else:
+                                recall[t, ct, k, a, m] = 0
 
-                        pr = pr.tolist(); q = q.tolist()
+                            pr = pr.tolist(); q = q.tolist()
 
-                        for i in range(nd - 1, 0, -1):
-                            if pr[i] > pr[i - 1]:
-                                pr[i - 1] = pr[i]
+                            for i in range(nd - 1, 0, -1):
+                                if pr[i] > pr[i - 1]:
+                                    pr[i - 1] = pr[i]
 
-                        inds = np.searchsorted(rc, p.recThrs, side='left')
-                        try:
-                            for ri, pi in enumerate(inds):
-                                q[ri] = pr[pi]
-                                ss[ri] = dtScoresSorted[pi]
-                        except:
-                            pass
-                        precision[t_ct, :, k, a, m] = np.array(q)
-                        scores[t_ct, :, k, a, m] = np.array(ss)
-
-        precision   = precision.reshape((T, CT, R, K, A, M))
-        recall      = recall.reshape((T, CT, K, A, M))
-        scores      = scores.reshape((T, CT, R, K, A, M))
+                            inds = np.searchsorted(rc, p.recThrs, side='left')
+                            try:
+                                for ri, pi in enumerate(inds):
+                                    q[ri] = pr[pi]
+                                    ss[ri] = dtScoresSorted[pi]
+                            except:
+                                pass
+                            precision[t, ct, :, k, a, m] = np.array(q)
+                            scores[t, ct, :, k, a, m] = np.array(ss)
 
         self.eval = {
             'params': p,
