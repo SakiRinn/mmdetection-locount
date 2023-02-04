@@ -884,7 +884,7 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
-                    losses['acc_cnt'] = torch.tensor(cnt_accuracy(cnt_score, counts, reduce_mean=True))
+                    losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
 
         return losses
 
