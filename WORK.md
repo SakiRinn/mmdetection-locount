@@ -38,10 +38,14 @@
 * `mmdet/models/detectors/two_stage.py`\
   **基类**。添加`TwoStageDetectorWithCount`类。\
   具体为，在`forward_train`函数里，调用`roi_head`的`forward_train`时添加`gt_count`变量。
+* `mmdet/models/detectors/single_stage.py`\
+  **基类**。添加`SingleStageDetectorWithCount`类。
 * `mmdet/models/detectors/cascade_rcnn.py`\
   添加`CascadeRCNNWithCount`类，仅修改了基类。
 * `mmdet/models/detectors/faster_rcnn.py`
   添加`FasterRCNNWithCount`类，仅修改了基类。
+* `mmdet/models/detectors/faster_rcnn.py`
+  添加`RetinaNetWithCount`类，仅修改了基类。
 
 ### `models/dense_heads`部分
 已完工，仅基类可复用。
