@@ -3,7 +3,7 @@ import warnings
 
 import torch
 
-from mmdet.core import bbox2result
+from mmdet.core import bbox2result, bbox2result_with_count
 from ..builder import DETECTORS, build_backbone, build_head, build_neck
 from .base import BaseDetector
 
@@ -169,3 +169,46 @@ class SingleStageDetector(BaseDetector):
             *outs, img_metas, with_nms=with_nms)
 
         return det_bboxes, det_labels
+
+
+@DETECTORS.register_module()
+class SingleStageDetectorWithCount(SingleStageDetector):
+
+    def forward_train(self,
+                      img,
+                      img_metas,
+                      gt_bboxes,
+                      gt_labels,
+                      gt_counts,
+                      gt_bboxes_ignore=None):
+        super(SingleStageDetector, self).forward_train(img, img_metas)
+        x = self.extract_feat(img)
+        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
+                                              gt_labels, gt_counts, gt_bboxes_ignore)
+        return losses
+
+    def simple_test(self, img, img_metas, rescale=False):
+        feat = self.extract_feat(img)
+        results_list = self.bbox_head.simple_test(
+            feat, img_metas, rescale=rescale)
+        bbox_results = [
+            bbox2result_with_count(det_bboxes, det_labels, det_counts,
+                                   self.bbox_head.num_classes, self.bbox_head.num_counts)
+            for det_bboxes, det_labels, det_counts in results_list
+        ]
+        return bbox_results
+
+    def aug_test(self, imgs, img_metas, rescale=False):
+        assert hasattr(self.bbox_head, 'aug_test'), \
+            f'{self.bbox_head.__class__.__name__}' \
+            ' does not support test-time augmentation'
+
+        feats = self.extract_feats(imgs)
+        results_list = self.bbox_head.aug_test(
+            feats, img_metas, rescale=rescale)
+        bbox_results = [
+            bbox2result_with_count(det_bboxes, det_labels, det_counts,
+                                   self.bbox_head.num_classes, self.bbox_head.num_counts)
+            for det_bboxes, det_labels, det_counts in results_list
+        ]
+        return bbox_results

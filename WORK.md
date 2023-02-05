@@ -44,16 +44,14 @@
   添加`FasterRCNNWithCount`类，仅修改了基类。
 
 ### `models/dense_heads`部分
-已完工，可复用，基本无修改。
+已完工，仅基类可复用。
+适用于单stage结构。对于多stage的RPN部分，仅使用不带count的dense head即可。
 * `mmdet/models/dense_heads/base_dense_head.py`\
-  **基类**。添加`BaseDenseHeadWithCount`类。\
-  其实什么都没改，也根本不用改。
+  **基类**。添加`BaseDenseHeadWithCount`类。
 * `mmdet/models/dense_heads/anchor_head.py`\
   添加`AnchorHeadWithCount`类。
-  仅修改了部分函数的输入参数，核心部分未修改（无需添加cnt）。
-* `mmdet/models/dense_heads/rpn_head.py`\
-  添加`RPNHeadWithCount`类。\
-  基本无修改，仅指定了`loss`函数的`gt_count=None`.
+* `mmdet/models/dense_heads/retina_head.py`
+  添加`RetinaHeadWithCount`类。
 
 ### `models/roi_heads`部分
 已完工，仅基类可复用。

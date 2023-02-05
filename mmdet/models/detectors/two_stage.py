@@ -259,7 +259,6 @@ class TwoStageDetectorWithCount(TwoStageDetector):
                 img_metas,
                 gt_bboxes,
                 gt_labels=None,
-                gt_counts=None,
                 gt_bboxes_ignore=gt_bboxes_ignore,
                 proposal_cfg=proposal_cfg,
                 **kwargs)

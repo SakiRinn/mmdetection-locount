@@ -28,9 +28,9 @@ from .paa_head import PAAHead
 from .pisa_retinanet_head import PISARetinaHead
 from .pisa_ssd_head import PISASSDHead
 from .reppoints_head import RepPointsHead
-from .retina_head import RetinaHead
+from .retina_head import RetinaHead, RetinaHeadWithCount
 from .retina_sepbn_head import RetinaSepBNHead
-from .rpn_head import RPNHead, RPNHeadWithCount
+from .rpn_head import RPNHead
 from .sabl_retina_head import SABLRetinaHead
 from .solo_head import DecoupledSOLOHead, DecoupledSOLOLightHead, SOLOHead
 from .solov2_head import SOLOV2Head
@@ -55,5 +55,5 @@ __all__ = [
     'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
-    'AnchorHeadWithCount', 'RPNHeadWithCount'
+    'AnchorHeadWithCount', 'RetinaHeadWithCount'
 ]
