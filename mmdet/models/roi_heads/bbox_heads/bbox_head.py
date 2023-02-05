@@ -754,7 +754,7 @@ class BBoxHeadWithCount(BBoxHead):
                                      dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
         counts = pos_bboxes.new_full((num_samples, ),
-                                     self.num_counts,       # count: be real.
+                                     0,                 # No count, corresponding to bg(num_classes).
                                      dtype=torch.long)
         count_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)

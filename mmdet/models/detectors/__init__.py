@@ -9,7 +9,7 @@ from .ddod import DDOD
 from .deformable_detr import DeformableDETR
 from .detr import DETR
 from .fast_rcnn import FastRCNN
-from .faster_rcnn import FasterRCNN
+from .faster_rcnn import FasterRCNN, FasterRCNNWithCount
 from .fcos import FCOS
 from .fovea import FOVEA
 from .fsaf import FSAF
@@ -29,7 +29,7 @@ from .panoptic_two_stage_segmentor import TwoStagePanopticSegmentor
 from .point_rend import PointRend
 from .queryinst import QueryInst
 from .reppoints_detector import RepPointsDetector
-from .retinanet import RetinaNet
+from .retinanet import RetinaNet, RetinaNetWithCount
 from .rpn import RPN
 from .scnet import SCNet
 from .single_stage import SingleStageDetector
@@ -55,5 +55,6 @@ __all__ = [
     'SOLOv2', 'DeformableDETR', 'AutoAssign', 'YOLOF', 'CenterNet', 'YOLOX',
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
     'MaskFormer', 'DDOD', 'Mask2Former',
-    'TwoStageDetectorWithCount', 'CascadeRCNNWithCount'
+    'TwoStageDetectorWithCount', 'CascadeRCNNWithCount', 'FasterRCNNWithCount',
+    'RetinaNetWithCount'
 ]

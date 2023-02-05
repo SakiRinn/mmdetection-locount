@@ -8,7 +8,7 @@ from mmcv.cnn import ConvModule
 from mmcv.ops import batched_nms
 
 from ..builder import HEADS
-from .anchor_head import AnchorHead, AnchorHeadWithCount
+from .anchor_head import AnchorHead
 
 
 @HEADS.register_module()
@@ -263,34 +263,3 @@ class RPNHead(AnchorHead):
                                          score_threshold, nms_pre,
                                          cfg.max_per_img)
         return dets
-
-
-@HEADS.register_module()
-class RPNHeadWithCount(AnchorHeadWithCount, RPNHead):
-
-    def __init__(self,
-                 in_channels,
-                 init_cfg=dict(type='Normal', layer='Conv2d', std=0.01),
-                 num_convs=1,
-                 **kwargs):
-        self.num_convs = num_convs
-        super(RPNHeadWithCount, self).__init__(
-            1, 1, in_channels, init_cfg=init_cfg, **kwargs)
-
-    def loss(self,
-             cls_scores,
-             bbox_preds,
-             gt_bboxes,
-             img_metas,
-             gt_bboxes_ignore=None):
-        losses = super(RPNHeadWithCount, self).loss(
-            cls_scores,
-            bbox_preds,
-            gt_bboxes,
-            None,
-            None,
-            img_metas,
-            gt_bboxes_ignore=gt_bboxes_ignore)
-        return dict(
-            # loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'], loss_rpn_cnt=losses['loss_cnt'])
-            loss_rpn_cls=losses['loss_cls'], loss_rpn_bbox=losses['loss_bbox'])
