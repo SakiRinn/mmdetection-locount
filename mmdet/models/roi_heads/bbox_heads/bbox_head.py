@@ -823,9 +823,9 @@ class BBoxHeadWithCount(BBoxHead):
              reduction_override=None):
         losses = dict()
 
-        learning_bbox_weights = 1.0 * pow(2, -self.current_stage)
-        learning_cls_weights  = 1.0 * pow(2, -self.current_stage)
-        learning_cnt_weights  = pow(2, 1 - self.num_stages)
+        learning_bbox_weights = 1. * pow(2, -self.current_stage)
+        learning_cls_weights  = 1. * pow(2, -self.current_stage)
+        learning_cnt_weights  = 1. * pow(2, -self.num_stages)
 
         # bbox
         if bbox_pred is not None:
