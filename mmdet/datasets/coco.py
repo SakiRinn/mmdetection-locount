@@ -392,6 +392,7 @@ class CocoDataset(CustomDataset):
                           classwise=False,
                           proposal_nums=(100, 300, 1000),
                           iou_thrs=None,
+                          ac_thrs=None,
                           metric_items=None):
         """Instance segmentation and object detection evaluation in COCO
         protocol.
@@ -426,6 +427,9 @@ class CocoDataset(CustomDataset):
         """
         if iou_thrs is None:
             iou_thrs = np.linspace(
+                .5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
+        if ac_thrs is None:
+            ac_thrs = np.linspace(
                 .5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
         if metric_items is not None:
             if not isinstance(metric_items, list):
@@ -485,20 +489,22 @@ class CocoDataset(CustomDataset):
             cocoEval.params.imgIds = self.img_ids
             cocoEval.params.maxDets = list(proposal_nums)
             cocoEval.params.iouThrs = iou_thrs
+            cocoEval.params.acThrs = ac_thrs
             # mapping of cocoEval.stats
             coco_metric_names = {
                 'mAP': 0,
-                'mAP_50': 1,
-                'mAP_75': 2,
-                'mAP_s': 3,
-                'mAP_m': 4,
-                'mAP_l': 5,
-                'AR@100': 6,
-                'AR@300': 7,
-                'AR@1000': 8,
-                'AR_s@1000': 9,
-                'AR_m@1000': 10,
-                'AR_l@1000': 11
+                'mAP@150': 1,
+                'mAP_50': 2,
+                'mAP_75': 3,
+                'mAP_s': 4,
+                'mAP_m': 5,
+                'mAP_l': 6,
+                'AR@100': 7,
+                'AR@300': 8,
+                'AR@1000': 9,
+                'AR_s@1000': 10,
+                'AR_m@1000': 11,
+                'AR_l@1000': 12
             }
             if metric_items is not None:
                 for metric_item in metric_items:
@@ -508,6 +514,7 @@ class CocoDataset(CustomDataset):
 
             if metric == 'proposal':
                 cocoEval.params.useCats = 0
+                cocoEval.params.useCnts = 0
                 cocoEval.evaluate()
                 cocoEval.accumulate()
 
@@ -573,7 +580,8 @@ class CocoDataset(CustomDataset):
 
                 if metric_items is None:
                     metric_items = [
-                        'mAP', 'mAP_50', 'mAP_75', 'mAP_s', 'mAP_m', 'mAP_l'
+                        'mAP', 'mAP@150', 'mAP_50', 'mAP_75',
+                        'mAP_s', 'mAP_m', 'mAP_l'
                     ]
 
                 for metric_item in metric_items:
@@ -582,10 +590,10 @@ class CocoDataset(CustomDataset):
                         f'{cocoEval.stats[coco_metric_names[metric_item]]:.3f}'
                     )
                     eval_results[key] = val
-                ap = cocoEval.stats[:6]
+                ap = cocoEval.stats[:7]
                 eval_results[f'{metric}_mAP_copypaste'] = (
                     f'{ap[0]:.3f} {ap[1]:.3f} {ap[2]:.3f} {ap[3]:.3f} '
-                    f'{ap[4]:.3f} {ap[5]:.3f}')
+                    f'{ap[4]:.3f} {ap[5]:.3f} {ap[6]:.3f}')
 
         return eval_results
 
@@ -597,6 +605,7 @@ class CocoDataset(CustomDataset):
                  classwise=False,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
+                 ac_thrs=None,
                  metric_items=None):
         """Evaluation in COCO protocol.
 
@@ -642,7 +651,7 @@ class CocoDataset(CustomDataset):
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,
                                               metrics, logger, classwise,
-                                              proposal_nums, iou_thrs,
+                                              proposal_nums, iou_thrs, ac_thrs,
                                               metric_items)
 
         if tmp_dir is not None:
