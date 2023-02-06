@@ -576,7 +576,10 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
                      type='SmoothL1Loss',
                      beta=1.0 / 9.0,
                      loss_weight=1.0),
-                 loss_cnt=None,
+                 loss_cnt=dict(
+                     type='CrossEntropyLoss',
+                     use_sigmoid=True,
+                     loss_weight=1.0),
                  train_cfg=None,
                  test_cfg=None,
                  init_cfg=dict(
@@ -589,6 +592,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
         self.num_counts = num_counts
         self.feat_channels = feat_channels
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
+        self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)
         if self.use_sigmoid_cls:
             self.cls_out_channels = num_classes
         else:
@@ -856,7 +860,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
         anchor_list, valid_flag_list = self.get_anchors(
             featmap_sizes, img_metas, device=device)
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
-        count_channels = self.cnt_out_channels
+        count_channels = self.cnt_out_channels if self.use_sigmoid_cnt else 1
         cls_reg_cnt_targets = self.get_targets(
             anchor_list,
             valid_flag_list,
