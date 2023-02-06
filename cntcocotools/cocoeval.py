@@ -385,20 +385,19 @@ class COCOeval:
             return mean_s
 
         def _summarizeDets():
-            stats = np.zeros((13,))
+            stats = np.zeros((12,))
             stats[0] = _summarize(1)
-            stats[1] = _summarize(1, maxDets=150)
-            stats[2] = _summarize(1, iouThr=.5, acThr=.5, maxDets=self.params.maxDets[2])
-            stats[3] = _summarize(1, iouThr=.75, acThr=.75, maxDets=self.params.maxDets[2])
-            stats[4] = _summarize(1, areaRng='small', maxDets=self.params.maxDets[2])
-            stats[5] = _summarize(1, areaRng='medium', maxDets=self.params.maxDets[2])
-            stats[6] = _summarize(1, areaRng='large', maxDets=self.params.maxDets[2])
-            stats[7] = _summarize(0, maxDets=self.params.maxDets[0])
-            stats[8] = _summarize(0, maxDets=self.params.maxDets[1])
-            stats[9] = _summarize(0, maxDets=self.params.maxDets[2])
-            stats[10] = _summarize(0, areaRng='small', maxDets=self.params.maxDets[2])
-            stats[11] = _summarize(0, areaRng='medium', maxDets=self.params.maxDets[2])
-            stats[12] = _summarize(0, areaRng='large', maxDets=self.params.maxDets[2])
+            stats[1] = _summarize(1, iouThr=.5, acThr=.5, maxDets=self.params.maxDets[2])
+            stats[2] = _summarize(1, iouThr=.75, acThr=.75, maxDets=self.params.maxDets[2])
+            stats[3] = _summarize(1, areaRng='small', maxDets=self.params.maxDets[2])
+            stats[4] = _summarize(1, areaRng='medium', maxDets=self.params.maxDets[2])
+            stats[5] = _summarize(1, areaRng='large', maxDets=self.params.maxDets[2])
+            stats[6] = _summarize(0, maxDets=self.params.maxDets[0])
+            stats[7] = _summarize(0, maxDets=self.params.maxDets[1])
+            stats[8] = _summarize(0, maxDets=self.params.maxDets[2])
+            stats[9] = _summarize(0, areaRng='small', maxDets=self.params.maxDets[2])
+            stats[10] = _summarize(0, areaRng='medium', maxDets=self.params.maxDets[2])
+            stats[11] = _summarize(0, areaRng='large', maxDets=self.params.maxDets[2])
             return stats
 
         def _summarizeKps():
@@ -436,7 +435,7 @@ class Params:
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
         self.acThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)    # ADD
         self.recThrs = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
-        self.maxDets = [1, 10, 100]
+        self.maxDets = [150, 300, 1000]
         self.areaRng = [[0**2, 1e5**2], [0**2, 150**2], [150**2, 300**2], [300** 2, 1e5**2]]        # EDIT
         self.areaRngLbl = ['all', 'small', 'medium', 'large']
         self.cntRng = [[0, 1e5], [0, 1], [2, 10], [11, 1e5]]                                        # ADD
