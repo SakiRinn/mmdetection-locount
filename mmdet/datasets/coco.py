@@ -390,7 +390,7 @@ class CocoDataset(CustomDataset):
                           metrics,
                           logger=None,
                           classwise=False,
-                          proposal_nums=(100, 300, 1000),
+                          proposal_nums=(150, 300, 1000),
                           iou_thrs=None,
                           ac_thrs=None,
                           metric_items=None):
@@ -603,7 +603,7 @@ class CocoDataset(CustomDataset):
                  logger=None,
                  jsonfile_prefix=None,
                  classwise=False,
-                 proposal_nums=(100, 300, 1000),
+                 proposal_nums=(150, 300, 1000),
                  iou_thrs=None,
                  ac_thrs=None,
                  metric_items=None):
