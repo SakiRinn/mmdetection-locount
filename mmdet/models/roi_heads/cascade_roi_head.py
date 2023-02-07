@@ -637,6 +637,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
     def __init__(self,
                  num_stages,
                  stage_loss_weights,
+                 stage_cnt_loss_weights=[0.1, 0.1, 0.1],
                  bbox_roi_extractor=None,
                  bbox_head=None,
                  mask_roi_extractor=None,
@@ -653,6 +654,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
 
         self.num_stages = num_stages
         self.stage_loss_weights = stage_loss_weights
+        self.stage_cnt_loss_weights = stage_cnt_loss_weights
         super(CascadeRoIHead, self).__init__(
             bbox_roi_extractor=bbox_roi_extractor,
             bbox_head=bbox_head,
@@ -743,6 +745,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
             self.current_stage = i
             rcnn_train_cfg = self.train_cfg[i]
             lw = self.stage_loss_weights[i]
+            lw_cnt = self.stage_loss_weights[i]
 
             sampling_results = []
             if self.with_bbox or self.with_mask:
@@ -770,8 +773,10 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
                                                     rcnn_train_cfg)
 
             for name, value in bbox_results['loss_bbox'].items():
-                losses[f's{i}.{name}'] = (
-                    value * lw if 'loss' in name else value)
+                if name.endswith('_cnt'):
+                    losses[f's{i}.{name}'] = (value * lw_cnt if 'loss' in name else value)
+                else:
+                    losses[f's{i}.{name}'] = (value * lw if 'loss' in name else value)
 
             # mask head forward and loss
             if self.with_mask:
@@ -779,8 +784,10 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
                     i, x, sampling_results, gt_masks, rcnn_train_cfg,
                     bbox_results['bbox_feats'])
                 for name, value in mask_results['loss_mask'].items():
-                    losses[f's{i}.{name}'] = (
-                        value * lw if 'loss' in name else value)
+                    if name.endswith('_cnt'):
+                        losses[f's{i}.{name}'] = (value * lw_cnt if 'loss' in name else value)
+                    else:
+                        losses[f's{i}.{name}'] = (value * lw if 'loss' in name else value)
 
             # refine bboxes
             if i < self.num_stages - 1:

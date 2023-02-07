@@ -49,11 +49,7 @@ model = dict(
         bbox_head=[
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
                 num_shared_fcs=2,
-                num_cls_fcs=1,
-                num_reg_fcs=1,
-                num_cnt_fcs=1,
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -78,11 +74,7 @@ model = dict(
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
                 num_shared_fcs=2,
-                num_cls_fcs=1,
-                num_reg_fcs=1,
-                num_cnt_fcs=1,
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -107,11 +99,7 @@ model = dict(
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
-                num_shared_convs=1,
                 num_shared_fcs=2,
-                num_cls_fcs=1,
-                num_reg_fcs=1,
-                num_cnt_fcs=1,
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
@@ -209,7 +197,8 @@ model = dict(
                 pos_weight=-1,
                 debug=False)
         ],
-        stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters, 2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]
+        stage_loss_weights=[1.0, 0.5, 0.25],
+        stage_cnt_loss_weights=[0.1, 0.1, 0.1]),
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,

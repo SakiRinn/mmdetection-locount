@@ -709,7 +709,7 @@ class BBoxHeadWithCount(BBoxHead):
             if self.with_cnt:
                 self.init_cfg += [
                     dict(
-                        type='Normal', std=0.001, override=dict(name='fc_cnt'))
+                        type='Normal', std=0.01, override=dict(name='fc_cnt'))
                 ]
 
     @property
@@ -823,10 +823,6 @@ class BBoxHeadWithCount(BBoxHead):
              reduction_override=None):
         losses = dict()
 
-        learning_bbox_weights = 1. * pow(2, -self.current_stage)
-        learning_cls_weights  = 1. * pow(2, -self.current_stage)
-        learning_cnt_weights  = 1. * pow(2, -self.num_stages)
-
         # bbox
         if bbox_pred is not None:
             bg_class_ind = self.num_classes
@@ -842,7 +838,7 @@ class BBoxHeadWithCount(BBoxHead):
                         bbox_pred.size(0), -1,
                         4)[pos_inds.type(torch.bool),
                            labels[pos_inds.type(torch.bool)]]
-                losses['loss_bbox'] = learning_bbox_weights * self.loss_bbox(
+                losses['loss_bbox'] = self.loss_bbox(
                     pos_bbox_pred,
                     bbox_targets[pos_inds.type(torch.bool)],
                     bbox_weights[pos_inds.type(torch.bool)],
@@ -854,7 +850,7 @@ class BBoxHeadWithCount(BBoxHead):
         if cls_score is not None:
             avg_factor = max(torch.sum(label_weights > 0).float().item(), 1.)
             if cls_score.numel() > 0:
-                loss_cls_ = learning_cls_weights * self.loss_cls(
+                loss_cls_ = self.loss_cls(
                     cls_score,
                     labels,
                     label_weights,
@@ -873,7 +869,7 @@ class BBoxHeadWithCount(BBoxHead):
         if cnt_score is not None:
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
             if cnt_score.numel() > 0:
-                loss_cnt_ = learning_cnt_weights * self.loss_cnt(
+                loss_cnt_ = self.loss_cnt(
                     cnt_score,
                     counts,
                     count_weights,
@@ -942,16 +938,16 @@ class BBoxHeadWithCount(BBoxHead):
             det_bboxes = torch.cat([det_bboxes, cnt_scores.unsqueeze(-1)], -1)
             return det_bboxes, det_labels, det_counts
 
-    def init_weights(self):
-        if self.with_cls:
-            nn.init.normal_(self.fc_cls.weight, 0, 0.01)
-            nn.init.constant_(self.fc_cls.bias, 0)
-        if self.with_reg:
-            nn.init.normal_(self.fc_reg.weight, 0, 0.001)
-            nn.init.constant_(self.fc_reg.bias, 0)
-        if self.with_cnt:
-            nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
-            nn.init.constant_(self.fc_cnt.bias, 0)
+    # def init_weights(self):
+    #     if self.with_cls:
+    #         nn.init.normal_(self.fc_cls.weight, 0, 0.01)
+    #         nn.init.constant_(self.fc_cls.bias, 0)
+    #     if self.with_reg:
+    #         nn.init.normal_(self.fc_reg.weight, 0, 0.001)
+    #         nn.init.constant_(self.fc_reg.bias, 0)
+    #     if self.with_cnt:
+    #         nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
+    #         nn.init.constant_(self.fc_cnt.bias, 0)
 
     def div_counts(self, counts):
         if not isinstance(counts, torch.Tensor):
