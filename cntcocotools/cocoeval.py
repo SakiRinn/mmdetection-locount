@@ -350,7 +350,7 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc - tic))
 
     def summarize(self):
-        def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=100):
+        def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=150):
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | AC={:<9} | area={:>6s} | maxDets={:>4d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
@@ -386,7 +386,7 @@ class COCOeval:
 
         def _summarizeDets():
             stats = np.zeros((12,))
-            stats[0] = _summarize(1)
+            stats[0] = _summarize(1, maxDets=self.params.maxDets[0])
             stats[1] = _summarize(1, iouThr=.5, acThr=.5, maxDets=self.params.maxDets[2])
             stats[2] = _summarize(1, iouThr=.75, acThr=.75, maxDets=self.params.maxDets[2])
             stats[3] = _summarize(1, areaRng='small', maxDets=self.params.maxDets[2])
