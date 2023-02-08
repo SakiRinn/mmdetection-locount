@@ -35,11 +35,12 @@ class COCOeval:
                 ann['segmentation'] = rle
         p = self.params
 
-        kwargs = dict(imgIds=p.imgIds)
         if p.useCats:
-            kwargs.update(catIds=p.catIds)
-        gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(**kwargs))
-        dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(**kwargs))
+            gts=self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+            dts=self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+        else:
+            gts=self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds))
+            dts=self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds))
 
         if p.iouType == 'segm':
             _toMask(gts, self.cocoGt)
@@ -83,24 +84,23 @@ class COCOeval:
             computeIoU = self.computeIoU
         elif p.iouType == 'keypoints':
             computeIoU = self.computeOks
-        self.ious = {(imgId, catId): computeIoU(imgId, catId)
+        self.ious = {(imgId, catId): computeIoU(imgId, catId) \
                      for imgId in p.imgIds
                      for catId in catIds}
 
         evaluateImg = self.evaluateImg
         maxDet = p.maxDets[-1]
-        self.evalImgs = [evaluateImg(imgId, catId, areaRng, maxDet)
-                 for catId in catIds
-                 for areaRng in p.areaRng
-                 for imgId in p.imgIds
-             ]
+        self.evalImgs = [evaluateImg(imgId, catId, areaRng, maxDet) \
+                         for catId in catIds
+                         for areaRng in p.areaRng
+                         for imgId in p.imgIds]
         self._paramsEval = copy.deepcopy(self.params)
         toc = time.time()
-        print('DONE (t={:0.2f}s).'.format(toc-tic))
+        print('DONE (t={:0.2f}s).'.format(toc - tic))
 
     def computeIoU(self, imgId, catId):
         p = self.params
-        if p.useCats and p.useCnts:
+        if p.useCats:
             gt = self._gts[imgId, catId]
             dt = self._dts[imgId, catId]
         else:
@@ -160,8 +160,8 @@ class COCOeval:
                     dy = yd - yg
                 else:
                     z = np.zeros((k))
-                    dx = np.max((z, x0 - xd), axis=0)+np.max((z, xd - x1), axis=0)
-                    dy = np.max((z, y0 - yd), axis=0)+np.max((z, yd - y1), axis=0)
+                    dx = np.max((z, x0 - xd), axis=0) + np.max((z, xd - x1), axis=0)
+                    dy = np.max((z, y0 - yd), axis=0) + np.max((z, yd - y1), axis=0)
                 e = (dx**2 + dy**2) / vars / (gt['area'] + np.spacing(1)) / 2
                 if k1 > 0:
                     e=e[vg > 0]
@@ -170,7 +170,7 @@ class COCOeval:
 
     def evaluateImg(self, imgId, catId, aRng, maxDet):
         p = self.params
-        if p.useCats and p.useCnts:
+        if p.useCats:
             gt = self._gts[imgId, catId]
             dt = self._dts[imgId, catId]
         else:
@@ -207,7 +207,6 @@ class COCOeval:
             for tind, t in enumerate(p.iouThrs):
                 for ctind, ct in enumerate(p.acThrs):
                     for dind, d in enumerate(dt):
-
                         iou = min([t , 1 - 1e-10])
                         ac  = min([ct, 1 - 1e-10])
                         m   = -1
@@ -350,13 +349,13 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc - tic))
 
     def summarize(self):
-        def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=150):
+        def _summarize(ap=1, iouThr=None, acThr=None, areaRng='all', maxDets=100):
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | AC={:<9} | area={:>6s} | maxDets={:>4d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
-            typeStr = '(AP)' if ap==1 else '(AR)'
+            typeStr = '(AP)' if ap == 1 else '(AR)'
             iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
-                if iouThr is None else '{:0.2f}'.format(acThr)
+                if iouThr is None else '{:0.2f}'.format(iouThr)
             acStr  = '{:0.2f}:{:0.2f}'.format(p.acThrs[0], p.acThrs[-1]) \
                 if acThr  is None else '{:0.2f}'.format(acThr)
 
@@ -366,7 +365,7 @@ class COCOeval:
                 s = self.eval['precision']
                 if iouThr is not None:
                     t = np.where(iouThr == p.iouThrs)[0]
-                    s = s[t, ...]
+                    s = s[t]
                 if acThr is not None:
                     ct = np.where(acThr == p.acThrs)[0]
                     s = s[:, ct, ...]
@@ -376,8 +375,11 @@ class COCOeval:
                 if iouThr is not None:
                     t = np.where(iouThr == p.iouThrs)[0]
                     s = s[t]
+                if acThr is not None:
+                    ct = np.where(acThr == p.acThrs)[0]
+                    s = s[:, ct, ...]
                 s = s[:, :, :, aind, mind]
-            if len(s[s > -1])==0:
+            if len(s[s > -1]) == 0:
                 mean_s = -1
             else:
                 mean_s = np.mean(s[s > -1])
@@ -385,7 +387,7 @@ class COCOeval:
             return mean_s
 
         def _summarizeDets():
-            stats = np.zeros((12,))
+            stats = np.zeros((12, ))
             stats[0] = _summarize(1, maxDets=self.params.maxDets[0])
             stats[1] = _summarize(1, iouThr=.5, acThr=.5, maxDets=self.params.maxDets[2])
             stats[2] = _summarize(1, iouThr=.75, acThr=.75, maxDets=self.params.maxDets[2])
@@ -401,7 +403,7 @@ class COCOeval:
             return stats
 
         def _summarizeKps():
-            stats = np.zeros((10,))
+            stats = np.zeros((10, ))
             stats[0] = _summarize(1, maxDets=20)
             stats[1] = _summarize(1, maxDets=20, iouThr=.5)
             stats[2] = _summarize(1, maxDets=20, iouThr=.75)
