@@ -197,7 +197,8 @@ model = dict(
                 pos_weight=-1,
                 debug=False)
         ],
-        stage_loss_weights=[1.0, 1.0, 1.0]),  #Fixme: Very important parameters, 2020/04/03  [1, 0.5, 0.25]==>[1.0, 1.0, 1.0]
+        stage_loss_weights=[1.0, 0.5, 0.25],
+        stage_cnt_loss_weights=[0.1, 0.1, 0.1]),
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,
