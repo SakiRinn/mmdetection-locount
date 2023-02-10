@@ -135,11 +135,15 @@ class RetinaHeadWithCount(AnchorHeadWithCount):
                      type='Normal',
                      layer='Conv2d',
                      std=0.01,
-                     override=dict(
-                         type='Normal',
-                         name='retina_cls',
-                         std=0.01,
-                         bias_prob=0.01)),
+                     override=[
+                         dict(type='Normal',
+                              name='retina_cls',
+                              std=0.01,
+                              bias_prob=0.01),
+                         dict(type='Normal',
+                              name='retina_cnt',
+                              std=0.01,
+                              bias_prob=0.01)]),
                  **kwargs):
         self.stacked_convs = stacked_convs
         self.conv_cfg = conv_cfg
