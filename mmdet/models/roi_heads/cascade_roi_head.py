@@ -637,7 +637,8 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
     def __init__(self,
                  num_stages,
                  stage_loss_weights,
-                 stage_cnt_loss_weights=[0.1, 0.1, 0.1],
+                 stage_cnt_loss_weights,
+                 base=2,
                  bbox_roi_extractor=None,
                  bbox_head=None,
                  mask_roi_extractor=None,
@@ -655,6 +656,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
         self.num_stages = num_stages
         self.stage_loss_weights = stage_loss_weights
         self.stage_cnt_loss_weights = stage_cnt_loss_weights
+        self.base = base
         super(CascadeRoIHead, self).__init__(
             bbox_roi_extractor=bbox_roi_extractor,
             bbox_head=bbox_head,
@@ -679,7 +681,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
         assert len(bbox_roi_extractor) == len(bbox_head) == self.num_stages
 
         for i, (roi_extractor, head) in enumerate(zip(bbox_roi_extractor, bbox_head)):
-            head.update(current_stage=i, num_stages=self.num_stages)
+            head.update(current_stage=i, num_stages=self.num_stages, base=self.base)
             self.bbox_roi_extractor.append(build_roi_extractor(roi_extractor))
             self.bbox_head.append(build_head(head))
 
