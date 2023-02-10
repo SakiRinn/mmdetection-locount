@@ -926,10 +926,10 @@ class BBoxHeadWithCount(BBoxHead):
 
         # Determine the counts for all bboxes.
         if isinstance(cnt_scores, list):
-            cnt_scores = sum(cnt_scores) / float(len(cnt_scores))
-        cnt_scores = F.softmax(cnt_scores, dim=-1) if cnt_scores is not None else None
-        counts = torch.argmax(cnt_scores, dim=-1).unsqueeze(-1).type(torch.long)
-        cnt_scores = torch.max(cnt_scores, dim=-1)[0].unsqueeze(-1)
+            cnt_scores = torch.stack(cnt_scores, dim=0)
+            cnt_scores = torch.sum(cnt_scores, dim=0) / float(len(cnt_scores))
+        cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+        cnt_scores, counts = cnt_scores.unsqueeze(-1), counts.unsqueeze(-1)
 
         if cfg is None:
             return bboxes, scores, cnt_scores

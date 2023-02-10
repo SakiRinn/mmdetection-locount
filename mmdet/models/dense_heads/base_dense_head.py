@@ -617,6 +617,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
         mlvl_scores = []
         mlvl_labels = []
         mlvl_cnt_scores = []
+        mlvl_counts = []
         if with_score_factors:
             mlvl_score_factors = []
         else:
@@ -662,7 +663,10 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             bbox_pred = filtered_results['bbox_pred']
             priors = filtered_results['priors']
 
-            cnt_scores = cnt_scores[keep_idxs]
+            # Determine the counts for all bboxes.
+            cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+            cnt_scores, counts = cnt_scores[keep_idxs], counts[keep_idxs]
+
             if with_score_factors:
                 score_factor = score_factor[keep_idxs]
             if with_cnt_score_factors:
@@ -675,14 +679,14 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             mlvl_scores.append(scores)
             mlvl_labels.append(labels)
             mlvl_cnt_scores.append(cnt_scores)
+            mlvl_counts.append(counts)
             if with_score_factors:
                 mlvl_score_factors.append(score_factor)
             if with_cnt_score_factors:
                 mlvl_cnt_score_factors.append(cnt_score_factor)
 
-        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_bboxes,
-                                       img_meta['scale_factor'], cfg, rescale,
-                                       with_nms, mlvl_score_factors, **kwargs)
+        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_cnt_scores, mlvl_counts, mlvl_bboxes,
+                                       img_meta['scale_factor'], cfg, rescale, with_nms, mlvl_score_factors, **kwargs)
 
     def _bbox_post_process(self,
                            mlvl_scores,
@@ -722,7 +726,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
 
             det_bboxes, keep_idxs = batched_nms(mlvl_bboxes, mlvl_scores,
                                                 mlvl_labels, cfg.nms)
-            det_bboxes = det_bboxes[:cfg.max_per_img]
+            det_bboxes = torch.cat([det_bboxes, mlvl_cnt_scores[keep_idxs].unsqueeze(-1)], -1)[:cfg.max_per_img]
             det_labels = mlvl_labels[keep_idxs][:cfg.max_per_img]
             det_counts = mlvl_counts[keep_idxs][:cfg.max_per_img]
             return det_bboxes, det_labels, det_counts
