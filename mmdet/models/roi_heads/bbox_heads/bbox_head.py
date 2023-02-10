@@ -720,7 +720,7 @@ class BBoxHeadWithCount(BBoxHead):
             return self.num_counts + 1
         num_digits = math.ceil(math.log(self.num_counts - 1, self.base))        # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
-        return 1 << (num_digits - (self.num_stages - self.current_stage - 1)*stg_digits)
+        return self.base**(num_digits - stg_digits*(self.num_stages - self.current_stage - 1))
 
     @property
     def custom_cnt_channels(self):
@@ -961,7 +961,7 @@ class BBoxHeadWithCount(BBoxHead):
 
         num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, self.base)))     # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
-        interval = 1 << ((self.num_stages - self.current_stage - 1)*stg_digits)
+        interval = self.base**(stg_digits*(self.num_stages - self.current_stage - 1))
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
 
         new_counts = torch.floor(counts / interval).to(torch.long)

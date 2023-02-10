@@ -25,6 +25,7 @@ model = dict(
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
+        cnt_loss_weight=0.25,
         anchor_generator=dict(
             type='AnchorGenerator',
             octave_base_scale=4,
