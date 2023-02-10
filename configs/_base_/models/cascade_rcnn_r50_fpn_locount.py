@@ -41,6 +41,8 @@ model = dict(
         type='CascadeRoIHeadWithCount',
         num_stages=3,
         stage_loss_weights=[1, 0.5, 0.25],
+        stage_cnt_loss_weights=[0.1, 0.1, 0.1],
+        base=2,
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),  # sample_num=2 ?
@@ -53,7 +55,7 @@ model = dict(
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=140,  # 原80
+                num_classes=140,
                 num_counts=56,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
@@ -78,7 +80,7 @@ model = dict(
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=140,  # 原80
+                num_classes=140,
                 num_counts=56,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
@@ -103,7 +105,7 @@ model = dict(
                 in_channels=256,
                 fc_out_channels=1024,
                 roi_feat_size=7,
-                num_classes=140,  # 原80
+                num_classes=140,
                 num_counts=56,
                 bbox_coder=dict(
                     type='DeltaXYWHBBoxCoder',
@@ -121,7 +123,7 @@ model = dict(
                 loss_cnt=dict(
                     type='CrossEntropyLoss',
                     use_sigmoid=False,
-                    loss_weight=1.0)),
+                    loss_weight=1.0))
         ]),
     # model training and testing settings
     train_cfg=dict(
@@ -196,9 +198,7 @@ model = dict(
                     add_gt_as_proposals=True),
                 pos_weight=-1,
                 debug=False)
-        ],
-        stage_loss_weights=[1.0, 0.5, 0.25],
-        stage_cnt_loss_weights=[0.1, 0.1, 0.1]),
+        ]),
     test_cfg=dict(
         rpn=dict(
             nms_pre=1000,

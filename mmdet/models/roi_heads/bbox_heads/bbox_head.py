@@ -611,6 +611,7 @@ class BBoxHeadWithCount(BBoxHead):
                  num_counts=56,                                     # ADD
                  current_stage=0,
                  num_stages=1,
+                 base=-1,
                  bbox_coder=dict(
                      type='DeltaXYWHBBoxCoder',
                      clip_border=True,
@@ -654,6 +655,7 @@ class BBoxHeadWithCount(BBoxHead):
         self.current_stage = current_stage
         self.num_stages = num_stages
         self.num_counts = num_counts
+        self.base = base                    # if -1, do nothing.
 
         self.bbox_coder = build_bbox_coder(bbox_coder)
         self.loss_cls = build_loss(loss_cls)
@@ -714,7 +716,9 @@ class BBoxHeadWithCount(BBoxHead):
 
     @property
     def coarse_counts(self):
-        num_digits = math.ceil(math.log(self.num_counts - 1, 2))        # e.g. 64 -> 7 digits, rather than 6.
+        if self.base == -1:
+            return self.num_counts + 1
+        num_digits = math.ceil(math.log(self.num_counts - 1, self.base))        # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         return 1 << (num_digits - (self.num_stages - self.current_stage - 1)*stg_digits)
 
@@ -952,8 +956,10 @@ class BBoxHeadWithCount(BBoxHead):
     def div_counts(self, counts):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
+        if self.base == -1:
+            return counts.to(torch.long)
 
-        num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, 2)))     # e.g. 64 -> 7 digits, rather than 6.
+        num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, self.base)))     # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         interval = 1 << ((self.num_stages - self.current_stage - 1)*stg_digits)
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.
