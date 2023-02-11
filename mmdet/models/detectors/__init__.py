@@ -32,7 +32,7 @@ from .reppoints_detector import RepPointsDetector
 from .retinanet import RetinaNet, RetinaNetWithCount
 from .rpn import RPN
 from .scnet import SCNet
-from .single_stage import SingleStageDetector
+from .single_stage import SingleStageDetector, SingleStageDetectorWithCount
 from .solo import SOLO
 from .solov2 import SOLOv2
 from .sparse_rcnn import SparseRCNN
@@ -55,6 +55,6 @@ __all__ = [
     'SOLOv2', 'DeformableDETR', 'AutoAssign', 'YOLOF', 'CenterNet', 'YOLOX',
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
     'MaskFormer', 'DDOD', 'Mask2Former',
-    'TwoStageDetectorWithCount', 'CascadeRCNNWithCount', 'FasterRCNNWithCount',
-    'RetinaNetWithCount'
+    'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
+    'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount'
 ]
