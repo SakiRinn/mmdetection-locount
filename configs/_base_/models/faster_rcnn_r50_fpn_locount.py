@@ -39,7 +39,7 @@ model = dict(
             loss_weight=1.0)),
     roi_head=dict(
         type='StandardRoIHeadWithCount',
-        cnt_loss_weight=0.25,
+        cnt_loss_weight=0.1,
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),

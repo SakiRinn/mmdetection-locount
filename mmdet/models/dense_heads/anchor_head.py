@@ -829,7 +829,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
         counts = counts.reshape(-1)
         count_weights = count_weights.reshape(-1)
         cnt_score = cnt_score.permute(0, 2, 3, 1).reshape(-1, self.cnt_out_channels)
-        loss_cnt = self.cnt_loss_weight * self.loss_cnt(
+        loss_cnt = self.cnt_loss_weight * self.loss_cnt(    # ADD weight
             cnt_score, counts, count_weights, avg_factor=num_total_samples)
         # bbox
         bbox_targets = bbox_targets.reshape(-1, 4)
