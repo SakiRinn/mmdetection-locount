@@ -329,11 +329,14 @@ class FCBBoxHeadWithCount(BBoxHeadWithCount, ConvFCBBoxHead):
                 in_features=self.reg_last_dim,
                 out_features=out_dim_reg)
         if self.with_cnt:
-            # self.fc_cnt = nn.Linear(self.cnt_last_dim, self.coarse_counts)
-            if self.custom_cnt_channels:
-                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            if self.reg_count_strategy:
+                cnt_channels = 1 if self.reg_class_agnostic else self.num_classes
             else:
-                cnt_channels = self.coarse_counts
+                if self.custom_cnt_channels:
+                    cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+                else:
+                    cnt_channels = self.coarse_counts
+            # self.fc_cnt = nn.Linear(self.cnt_last_dim, self.coarse_counts)
             self.fc_cnt = build_linear_layer(
                 self.cnt_predictor_cfg,
                 in_features=self.cnt_last_dim,

@@ -12,7 +12,7 @@ from mmdet.core.utils import filter_scores_and_topk, select_single_mlvl
 from mmdet.models.losses import cnt_accuracy
 from ..builder import HEADS, build_loss
 from .base_dense_head import BaseDenseHead, BaseDenseHeadWithCount
-from .dense_test_mixins import BBoxTestMixin
+from .dense_test_mixins import BBoxTestMixin, BBoxTestMixinWithCount
 
 
 @HEADS.register_module()
@@ -550,14 +550,13 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
 
 
 @HEADS.register_module()
-class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
+class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, AnchorHead):
 
     def __init__(self,
                  num_classes,
                  num_counts,
                  in_channels,
                  feat_channels=256,
-                 cnt_loss_weight=1.0,
                  anchor_generator=dict(
                      type='AnchorGenerator',
                      scales=[8, 16, 32],
@@ -592,7 +591,6 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
         self.num_classes = num_classes
         self.num_counts = num_counts
         self.feat_channels = feat_channels
-        self.cnt_loss_weight = cnt_loss_weight
 
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
         self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)
@@ -829,7 +827,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
         counts = counts.reshape(-1)
         count_weights = count_weights.reshape(-1)
         cnt_score = cnt_score.permute(0, 2, 3, 1).reshape(-1, self.cnt_out_channels)
-        loss_cnt = self.cnt_loss_weight * self.loss_cnt(    # ADD weight
+        loss_cnt = self.loss_cnt(
             cnt_score, counts, count_weights, avg_factor=num_total_samples)
         # bbox
         bbox_targets = bbox_targets.reshape(-1, 4)

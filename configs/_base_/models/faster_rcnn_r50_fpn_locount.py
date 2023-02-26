@@ -39,7 +39,6 @@ model = dict(
             loss_weight=1.0)),
     roi_head=dict(
         type='StandardRoIHeadWithCount',
-        cnt_loss_weight=0.1,
         bbox_roi_extractor=dict(
             type='SingleRoIExtractor',
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),
@@ -58,6 +57,7 @@ model = dict(
                 target_means=[0., 0., 0., 0.],
                 target_stds=[0.1, 0.1, 0.2, 0.2]),
             reg_class_agnostic=False,
+            reg_count_strategy=False,
             loss_cls=dict(
                 type='CrossEntropyLoss',
                 use_sigmoid=False,
@@ -68,8 +68,7 @@ model = dict(
                 loss_weight=1.0),
             loss_cnt=dict(
                 type='CrossEntropyLoss',
-                use_sigmoid=False,
-                loss_weight=1.0))),
+                loss_weight=0.1))),
     # model training and testing settings
     train_cfg=dict(
         rpn=dict(

@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from .anchor_free_head import AnchorFreeHead
+from .anchor_free_head import AnchorFreeHead, AnchorFreeHeadWithCount
 from .anchor_head import AnchorHead, AnchorHeadWithCount
 from .atss_head import ATSSHead
 from .autoassign_head import AutoAssignHead
@@ -11,7 +11,7 @@ from .ddod_head import DDODHead
 from .deformable_detr_head import DeformableDETRHead
 from .detr_head import DETRHead
 from .embedding_rpn_head import EmbeddingRPNHead
-from .fcos_head import FCOSHead
+from .fcos_head import FCOSHead, FCOSHeadWithCount
 from .fovea_head import FoveaHead
 from .free_anchor_retina_head import FreeAnchorRetinaHead
 from .fsaf_head import FSAFHead
@@ -55,5 +55,6 @@ __all__ = [
     'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
-    'AnchorHeadWithCount', 'RetinaHeadWithCount'
+    'AnchorHeadWithCount', 'AnchorFreeHeadWithCount',
+    'RetinaHeadWithCount', 'FCOSHeadWithCount'
 ]

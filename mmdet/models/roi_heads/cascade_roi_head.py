@@ -637,7 +637,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
     def __init__(self,
                  num_stages,
                  stage_loss_weights,
-                 stage_cnt_loss_weights,
+                 count_loss_weights,
                  base=2,
                  bbox_roi_extractor=None,
                  bbox_head=None,
@@ -655,7 +655,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
 
         self.num_stages = num_stages
         self.stage_loss_weights = stage_loss_weights
-        self.stage_cnt_loss_weights = stage_cnt_loss_weights
+        self.count_loss_weights = count_loss_weights
         self.base = base
         super(CascadeRoIHead, self).__init__(
             bbox_roi_extractor=bbox_roi_extractor,
@@ -747,7 +747,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
             self.current_stage = i
             rcnn_train_cfg = self.train_cfg[i]
             lw = self.stage_loss_weights[i]
-            lw_cnt = self.stage_loss_weights[i]
+            lw_cnt = self.count_loss_weights[i]
 
             sampling_results = []
             if self.with_bbox or self.with_mask:
@@ -823,7 +823,6 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
         scale_factors = tuple(meta['scale_factor'] for meta in img_metas)
 
         ms_bbox_result = {}
-        ms_cnt_bbox_result = {}
         ms_segm_result = {}
         ms_scores = []
         ms_cnt_scores = []

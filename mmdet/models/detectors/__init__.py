@@ -10,7 +10,7 @@ from .deformable_detr import DeformableDETR
 from .detr import DETR
 from .fast_rcnn import FastRCNN
 from .faster_rcnn import FasterRCNN, FasterRCNNWithCount
-from .fcos import FCOS
+from .fcos import FCOS, FCOSWithCount
 from .fovea import FOVEA
 from .fsaf import FSAF
 from .gfl import GFL
@@ -56,5 +56,6 @@ __all__ = [
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
     'MaskFormer', 'DDOD', 'Mask2Former',
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
-    'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount'
+    'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
+    'FCOSWithCount'
 ]
