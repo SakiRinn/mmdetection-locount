@@ -12,7 +12,7 @@ from mmdet.core.utils import filter_scores_and_topk, select_single_mlvl
 from mmdet.models.losses import cnt_accuracy
 from ..builder import HEADS, build_loss
 from .base_dense_head import BaseDenseHead, BaseDenseHeadWithCount
-from .dense_test_mixins import BBoxTestMixin
+from .dense_test_mixins import BBoxTestMixin, BBoxTestMixinWithCount
 
 
 @HEADS.register_module()
@@ -550,7 +550,7 @@ class AnchorHead(BaseDenseHead, BBoxTestMixin):
 
 
 @HEADS.register_module()
-class AnchorHeadWithCount(BaseDenseHeadWithCount, AnchorHead):
+class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, AnchorHead):
 
     def __init__(self,
                  num_classes,

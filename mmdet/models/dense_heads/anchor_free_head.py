@@ -10,8 +10,8 @@ from mmcv.runner import force_fp32
 from mmdet.core import build_bbox_coder, multi_apply
 from mmdet.core.anchor.point_generator import MlvlPointGenerator
 from ..builder import HEADS, build_loss
-from .base_dense_head import BaseDenseHead
-from .dense_test_mixins import BBoxTestMixin
+from .base_dense_head import BaseDenseHead, BaseDenseHeadWithCount
+from .dense_test_mixins import BBoxTestMixin, BBoxTestMixinWithCount
 
 
 @HEADS.register_module()
@@ -348,3 +348,190 @@ class AnchorFreeHead(BaseDenseHead, BBoxTestMixin):
             list[ndarray]: bbox results of each class
         """
         return self.aug_test_bboxes(feats, img_metas, rescale=rescale)
+
+
+@HEADS.register_module()
+class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, AnchorFreeHead):
+
+    _version = 1
+
+    def __init__(self,
+                 num_classes,
+                 num_counts,
+                 in_channels,
+                 feat_channels=256,
+                 cnt_loss_weight=1.0,
+                 stacked_convs=4,
+                 strides=(4, 8, 16, 32, 64),
+                 dcn_on_last_conv=False,
+                 conv_bias='auto',
+                 loss_cls=dict(
+                     type='FocalLoss',
+                     use_sigmoid=True,
+                     gamma=2.0,
+                     alpha=0.25,
+                     loss_weight=1.0),
+                 loss_bbox=dict(
+                     type='IoULoss',
+                     loss_weight=1.0),
+                 loss_cnt=dict(
+                     type='CrossEntropyLoss',
+                     use_sigmoid=True,
+                     loss_weight=1.0),
+                 bbox_coder=dict(type='DistancePointBBoxCoder'),
+                 conv_cfg=None,
+                 norm_cfg=None,
+                 train_cfg=None,
+                 test_cfg=None,
+                 init_cfg=dict(
+                     type='Normal',
+                     layer='Conv2d',
+                     std=0.01,
+                     override=[dict(type='Normal',
+                                    name='conv_cls',
+                                    std=0.01,
+                                    bias_prob=0.01),
+                               dict(type='Normal',
+                                    name='conv_cnt',
+                                    std=0.01,
+                                    bias_prob=0.01)])):
+        super(AnchorFreeHead, self).__init__(init_cfg)
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.num_counts = num_counts
+        self.feat_channels = feat_channels
+        self.cnt_loss_weight = cnt_loss_weight
+
+        self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
+        self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)
+        if self.use_sigmoid_cls:
+            self.cls_out_channels = num_classes
+        else:
+            self.cls_out_channels = num_classes + 1
+        self.cnt_out_channels = num_counts + 1          # count: idx to real.
+
+        self.stacked_convs = stacked_convs
+        self.strides = strides
+        self.dcn_on_last_conv = dcn_on_last_conv
+        assert conv_bias == 'auto' or isinstance(conv_bias, bool)
+        self.conv_bias = conv_bias
+
+        self.loss_cls = build_loss(loss_cls)
+        self.loss_bbox = build_loss(loss_bbox)
+        self.loss_cnt = build_loss(loss_cnt)
+        self.bbox_coder = build_bbox_coder(bbox_coder)
+
+        self.prior_generator = MlvlPointGenerator(strides)
+        self.num_base_priors = self.prior_generator.num_base_priors[0]
+
+        self.train_cfg = train_cfg
+        self.test_cfg = test_cfg
+        self.conv_cfg = conv_cfg
+        self.norm_cfg = norm_cfg
+        self.fp16_enabled = False
+
+        self._init_layers()
+
+    def _init_layers(self):
+        self._init_cls_convs()
+        self._init_reg_convs()
+        self._init_cnt_convs()
+        self._init_predictor()
+
+    def _init_cnt_convs(self):
+        self.cnt_convs = nn.ModuleList()
+        for i in range(self.stacked_convs):
+            chn = self.in_channels if i == 0 else self.feat_channels
+            if self.dcn_on_last_conv and i == self.stacked_convs - 1:
+                conv_cfg = dict(type='DCNv2')
+            else:
+                conv_cfg = self.conv_cfg
+            self.cnt_convs.append(
+                ConvModule(
+                    chn,
+                    self.feat_channels,
+                    3,
+                    stride=1,
+                    padding=1,
+                    conv_cfg=conv_cfg,
+                    norm_cfg=self.norm_cfg,
+                    bias=self.conv_bias))
+
+    def _init_predictor(self):
+        self.conv_cls = nn.Conv2d(
+            self.feat_channels, self.cls_out_channels, 3, padding=1)
+        self.conv_reg = nn.Conv2d(self.feat_channels, 4, 3, padding=1)
+        self.conv_cnt = nn.Conv2d(
+            self.feat_channels, self.cnt_out_channels, 3, padding=1)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        version = local_metadata.get('version', None)
+        if version is None:
+            bbox_head_keys = [
+                k for k in state_dict.keys() if k.startswith(prefix)
+            ]
+            ori_predictor_keys = []
+            new_predictor_keys = []
+
+            for key in bbox_head_keys:
+                ori_predictor_keys.append(key)
+                key = key.split('.')
+                conv_name = None
+                if key[1].endswith('cls'):
+                    conv_name = 'conv_cls'
+                elif key[1].endswith('reg'):
+                    conv_name = 'conv_reg'
+                elif key[1].endswith('cnt'):        # ADD
+                    conv_name = 'conv_cnt'
+                elif key[1].endswith('centerness'):
+                    conv_name = 'conv_centerness'
+                else:
+                    assert NotImplementedError
+                if conv_name is not None:
+                    key[1] = conv_name
+                    new_predictor_keys.append('.'.join(key))
+                else:
+                    ori_predictor_keys.pop(-1)
+            for i in range(len(new_predictor_keys)):
+                state_dict[new_predictor_keys[i]] = state_dict.pop(
+                    ori_predictor_keys[i])
+        super()._load_from_state_dict(state_dict, prefix, local_metadata,
+                                      strict, missing_keys, unexpected_keys,
+                                      error_msgs)
+
+    def forward(self, feats):
+        return multi_apply(self.forward_single, feats)[:2]
+
+    def forward_single(self, x):
+        cls_feat = x
+        reg_feat = x
+        cnt_feat = x
+
+        for cls_layer in self.cls_convs:
+            cls_feat = cls_layer(cls_feat)
+        cls_score = self.conv_cls(cls_feat)
+        for cnt_layer in self.cnt_convs:
+            cnt_feat = cnt_layer(cnt_feat)
+        cnt_score = self.conv_cnt(cnt_feat)
+        for reg_layer in self.reg_convs:
+            reg_feat = reg_layer(reg_feat)
+        bbox_pred = self.conv_reg(reg_feat)
+
+        return cls_score, bbox_pred, cnt_score, cls_feat, reg_feat, cnt_feat
+
+    @abstractmethod
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'gt_counts'))
+    def loss(self,
+             cls_scores,
+             bbox_preds,
+             gt_bboxes,
+             gt_labels,
+             gt_counts,
+             img_metas,
+             gt_bboxes_ignore=None):
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_targets(self, points, gt_bboxes_list, gt_labels_list, gt_counts_list):
+        raise NotImplementedError

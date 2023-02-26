@@ -204,3 +204,77 @@ class BBoxTestMixin(object):
         else:
             scores = torch.cat(aug_scores, dim=0)
             return bboxes, scores
+
+
+class BBoxTestMixinWithCount(BBoxTestMixin):
+
+    def aug_test_bboxes(self, feats, img_metas, rescale=False):
+        gb_sig = signature(self.get_bboxes)
+        gb_args = [p.name for p in gb_sig.parameters.values()]
+        gbs_sig = signature(self._get_bboxes_single)
+        gbs_args = [p.name for p in gbs_sig.parameters.values()]
+        assert ('with_nms' in gb_args) and ('with_nms' in gbs_args), \
+            f'{self.__class__.__name__}' \
+            ' does not support test-time augmentation'
+
+        aug_bboxes = []
+        aug_scores = []
+        aug_labels = []
+        aug_cnt_scores = []
+        aug_counts = []
+        for x, img_meta in zip(feats, img_metas):
+            outs = self.forward(x)
+            bbox_outputs = self.get_bboxes(
+                *outs,
+                img_metas=img_meta,
+                cfg=self.test_cfg,
+                rescale=False,
+                with_nms=False)[0]
+            aug_bboxes.append(bbox_outputs[0])
+            aug_scores.append(bbox_outputs[1])
+            if len(bbox_outputs) >= 3:
+                aug_labels.append(bbox_outputs[2])
+
+        merged_bboxes, merged_scores = self.merge_aug_bboxes(
+            aug_bboxes, aug_scores, img_metas)
+        merged_labels = torch.cat(aug_labels, dim=0) if aug_labels else None
+
+        if merged_bboxes.numel() == 0:
+            det_bboxes = torch.cat([merged_bboxes, merged_scores[:, None]], -1)
+            return [
+                (det_bboxes, merged_labels),
+            ]
+
+        det_bboxes, keep_idxs = batched_nms(merged_bboxes, merged_scores,
+                                            merged_labels, self.test_cfg.nms)
+        det_bboxes = det_bboxes[:self.test_cfg.max_per_img]
+        det_labels = merged_labels[keep_idxs][:self.test_cfg.max_per_img]
+
+        if rescale:
+            _det_bboxes = det_bboxes
+        else:
+            _det_bboxes = det_bboxes.clone()
+            _det_bboxes[:, :4] *= det_bboxes.new_tensor(
+                img_metas[0][0]['scale_factor'])
+
+        return [
+            (_det_bboxes, det_labels),      # TODO: det_counts, retina都不用的？
+        ]
+
+    def merge_aug_bboxes(self, aug_bboxes, aug_scores, aug_cnt_scores, img_metas):
+        recovered_bboxes = []
+        for bboxes, img_info in zip(aug_bboxes, img_metas):
+            img_shape = img_info[0]['img_shape']
+            scale_factor = img_info[0]['scale_factor']
+            flip = img_info[0]['flip']
+            flip_direction = img_info[0]['flip_direction']
+            bboxes = bbox_mapping_back(bboxes, img_shape, scale_factor, flip,
+                                       flip_direction)
+            recovered_bboxes.append(bboxes)
+        bboxes = torch.cat(recovered_bboxes, dim=0)
+        if aug_scores is None or aug_cnt_scores is None:
+            return bboxes
+        else:
+            scores = torch.cat(aug_scores, dim=0)
+            cnt_scores = torch.cat(aug_cnt_scores, dim=0)
+            return bboxes, scores, cnt_scores
