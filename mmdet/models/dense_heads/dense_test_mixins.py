@@ -258,7 +258,7 @@ class BBoxTestMixinWithCount(BBoxTestMixin):
                 img_metas[0][0]['scale_factor'])
 
         return [
-            (_det_bboxes, det_labels),      # TODO: det_counts, retina都不用的？
+            (_det_bboxes, det_labels),      # TODO: det_counts, retina/fcos都不用的？
         ]
 
     def merge_aug_bboxes(self, aug_bboxes, aug_scores, aug_cnt_scores, img_metas):

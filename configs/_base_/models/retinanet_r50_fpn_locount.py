@@ -25,7 +25,6 @@ model = dict(
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
-        cnt_loss_weight=0.1,
         anchor_generator=dict(
             type='AnchorGenerator',
             octave_base_scale=4,
@@ -48,7 +47,7 @@ model = dict(
         loss_cnt=dict(
             type='CrossEntropyLoss',
             use_sigmoid=False,
-            loss_weight=1.0)),
+            loss_weight=0.1)),
     # model training and testing settings
     train_cfg=dict(
         assigner=dict(

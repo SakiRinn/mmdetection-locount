@@ -462,7 +462,6 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount):
                  num_classes,
                  num_counts,
                  in_channels,
-                 cnt_loss_weight=1.0,
                  regress_ranges=((-1, 64), (64, 128), (128, 256), (256, 512),
                                  (512, INF)),
                  center_sampling=False,
@@ -509,7 +508,6 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount):
             num_classes,
             num_counts,
             in_channels,
-            cnt_loss_weight=cnt_loss_weight,
             loss_cls=loss_cls,
             loss_bbox=loss_bbox,
             loss_cnt=loss_cnt,
@@ -596,7 +594,7 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount):
         num_pos = max(reduce_mean(num_pos), 1.0)
         loss_cls = self.loss_cls(
             flatten_cls_scores, flatten_labels, avg_factor=num_pos)
-        loss_cnt = self.cnt_loss_weight * self.loss_cnt(                    # ADD
+        loss_cnt = self.loss_cnt(
             flatten_cnt_scores, flatten_counts, avg_factor=num_pos)
 
         pos_bbox_preds = flatten_bbox_preds[pos_inds]

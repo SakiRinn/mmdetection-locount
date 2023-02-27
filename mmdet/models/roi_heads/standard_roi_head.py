@@ -400,29 +400,6 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
 @HEADS.register_module()
 class StandardRoIHeadWithCount(BBoxTestMixinWithCount, StandardRoIHead):
 
-    def __init__(self,
-                 cnt_loss_weight=1.0,
-                 bbox_roi_extractor=None,
-                 bbox_head=None,
-                 mask_roi_extractor=None,
-                 mask_head=None,
-                 shared_head=None,
-                 train_cfg=None,
-                 test_cfg=None,
-                 pretrained=None,
-                 init_cfg=None):
-        super(StandardRoIHead, self).__init__(
-            bbox_roi_extractor,
-            bbox_head,
-            mask_roi_extractor,
-            mask_head,
-            shared_head,
-            train_cfg,
-            test_cfg,
-            pretrained,
-            init_cfg)
-        self.cnt_loss_weight = cnt_loss_weight
-
     def forward_dummy(self, x, proposals):
         # bbox head
         outs = ()
@@ -507,7 +484,6 @@ class StandardRoIHeadWithCount(BBoxTestMixinWithCount, StandardRoIHead):
                                         bbox_results['cnt_score'],
                                         rois,
                                         *bbox_targets)
-        loss_bbox['loss_cnt'] *= self.cnt_loss_weight
         bbox_results.update(loss_bbox=loss_bbox)
         return bbox_results
 

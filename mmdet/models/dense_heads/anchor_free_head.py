@@ -360,7 +360,6 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
                  num_counts,
                  in_channels,
                  feat_channels=256,
-                 cnt_loss_weight=1.0,
                  stacked_convs=4,
                  strides=(4, 8, 16, 32, 64),
                  dcn_on_last_conv=False,
@@ -400,7 +399,6 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
         self.num_classes = num_classes
         self.num_counts = num_counts
         self.feat_channels = feat_channels
-        self.cnt_loss_weight = cnt_loss_weight
 
         self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
         self.use_sigmoid_cnt = loss_cnt.get('use_sigmoid', False)

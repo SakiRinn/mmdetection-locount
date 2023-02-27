@@ -109,6 +109,8 @@
   **新文件夹**。用于整合locount配置。
 
 # 备注
+TODO: dense_test_mixins.py，修改aug_test函数。
+
 ## 生成数据集配置
 单独运行`tools/misc/locount_txt2json.py`中的`txt2json`函数，将得到的json文件放到数据文件夹。
 

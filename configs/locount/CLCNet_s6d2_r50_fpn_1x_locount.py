@@ -7,8 +7,8 @@ _base_ = [
 model = dict(
     roi_head=dict(
         num_stages=6,
-        stage_loss_weights=[1, 0.833, 0.667, 0.5, 0.333, 0.167],        # TODO
-        stage_cnt_loss_weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1],          # TODO
+        stage_loss_weights=[1.0, 0.833, 0.667, 0.5, 0.333, 0.167],      # TODO
+        count_loss_weights=[0.1, 0.1, 0.1, 0.1, 0.1, 0.1],              # TODO
         base=2,
         bbox_head=[
             dict(
