@@ -710,7 +710,7 @@ class BBoxHeadWithCount(BBoxHead):
             if self.with_cnt:
                 self.init_cfg += [dict(type='Normal', std=0.001, override=dict(name='fc_cnt'))] \
                                  if self.reg_count_strategy else \
-                                 [dict(type='Normal', std=0.01,override=dict(name='fc_cnt'))]
+                                 [dict(type='Normal', std=0.01, override=dict(name='fc_cnt'))]
 
     @property
     def coarse_counts(self):
@@ -838,9 +838,8 @@ class BBoxHeadWithCount(BBoxHead):
                         bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
                 else:
                     pos_bbox_pred = bbox_pred.view(
-                        bbox_pred.size(0), -1,
-                        4)[pos_inds.type(torch.bool),
-                           labels[pos_inds.type(torch.bool)]]
+                        bbox_pred.size(0), -1, 4)[pos_inds.type(torch.bool),
+                                                  labels[pos_inds.type(torch.bool)]]
                 losses['loss_bbox'] = self.loss_bbox(
                     pos_bbox_pred,
                     bbox_targets[pos_inds.type(torch.bool)],
@@ -872,7 +871,10 @@ class BBoxHeadWithCount(BBoxHead):
         if cnt_score is not None:
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
             if self.reg_count_strategy and not self.reg_class_agnostic:
-                    cnt_score = cnt_score[torch.arange(labels.size(0)), labels - 1]
+                cnt_score = cnt_score[pos_inds.type(torch.bool),
+                                      labels[pos_inds.type(torch.bool)]]
+                counts = counts[pos_inds.type(torch.bool)]
+                count_weights = count_weights[pos_inds.type(torch.bool)]
             if cnt_score.numel() > 0:
                 loss_cnt_ = self.loss_cnt(
                     cnt_score,
@@ -885,7 +887,11 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
+                    if not self.reg_count_strategy:
+                        cnt_score = cnt_score[pos_inds.type(torch.bool)]
+                        counts = counts[pos_inds.type(torch.bool)]
                     losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
+
         return losses
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred', 'cnt_score'))
