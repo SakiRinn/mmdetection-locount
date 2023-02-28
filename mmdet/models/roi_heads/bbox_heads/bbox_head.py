@@ -618,6 +618,7 @@ class BBoxHeadWithCount(BBoxHead):
                      target_means=[0., 0., 0., 0.],
                      target_stds=[0.1, 0.1, 0.2, 0.2]),
                  reg_class_agnostic=False,
+                 reg_count_strategy=False,
                  reg_decoded_bbox=False,
                  reg_predictor_cfg=dict(type='Linear'),
                  cls_predictor_cfg=dict(type='Linear'),
@@ -646,6 +647,7 @@ class BBoxHeadWithCount(BBoxHead):
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.reg_class_agnostic = reg_class_agnostic
+        self.reg_count_strategy = reg_count_strategy
         self.reg_decoded_bbox = reg_decoded_bbox
         self.reg_predictor_cfg = reg_predictor_cfg
         self.cls_predictor_cfg = cls_predictor_cfg
@@ -679,18 +681,21 @@ class BBoxHeadWithCount(BBoxHead):
                 out_features=cls_channels)
         # reg
         if self.with_reg:
-            out_dim_reg = 4 if reg_class_agnostic else 4 * num_classes
+            out_dim_reg = 4 if self.reg_class_agnostic else 4 * num_classes
             self.fc_reg = build_linear_layer(
                 self.reg_predictor_cfg,
                 in_features=in_channels,
                 out_features=out_dim_reg)
         # cnt
         if self.with_cnt:
-            # self.fc_cnt = nn.Linear(in_channels, cnt_channels)
-            if self.custom_cnt_channels:
-                cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+            if self.reg_count_strategy:
+                cnt_channels = 1 if self.reg_class_agnostic else num_classes
             else:
-                cnt_channels = self.coarse_counts       # NOT need to add background class
+                if self.custom_cnt_channels:
+                    cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
+                else:
+                    cnt_channels = self.coarse_counts       # NOT need to add background class
+            # self.fc_cnt = nn.Linear(in_channels, cnt_channels)
             self.fc_cnt = build_linear_layer(
                 self.cnt_predictor_cfg,
                 in_features=in_channels,
@@ -699,20 +704,13 @@ class BBoxHeadWithCount(BBoxHead):
         if init_cfg is None:
             self.init_cfg = []
             if self.with_cls:
-                self.init_cfg += [
-                    dict(
-                        type='Normal', std=0.01, override=dict(name='fc_cls'))
-                ]
+                self.init_cfg += [dict(type='Normal', std=0.01, override=dict(name='fc_cls'))]
             if self.with_reg:
-                self.init_cfg += [
-                    dict(
-                        type='Normal', std=0.001, override=dict(name='fc_reg'))
-                ]
+                self.init_cfg += [dict(type='Normal', std=0.001, override=dict(name='fc_reg'))]
             if self.with_cnt:
-                self.init_cfg += [
-                    dict(
-                        type='Normal', std=0.01, override=dict(name='fc_cnt'))
-                ]
+                self.init_cfg += [dict(type='Normal', std=0.001, override=dict(name='fc_cnt'))] \
+                                 if self.reg_count_strategy else \
+                                 [dict(type='Normal', std=0.01,override=dict(name='fc_cnt'))]
 
     @property
     def coarse_counts(self):
@@ -757,12 +755,13 @@ class BBoxHeadWithCount(BBoxHead):
                                      self.num_classes,
                                      dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
-        counts = pos_bboxes.new_full((num_samples, ),
-                                     0,                 # No count, corresponding to bg(num_classes).
-                                     dtype=torch.long)
-        count_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
         bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
+        counts = pos_bboxes.new_full((num_samples, ),
+                                    0,                  # No count, corresponding to BG (=num_classes).
+                                    dtype=torch.long)
+        count_weights = pos_bboxes.new_zeros(num_samples)
+
         if num_pos > 0:
             labels[:num_pos] = pos_gt_labels
             counts[:num_pos] = pos_gt_counts
@@ -872,12 +871,14 @@ class BBoxHeadWithCount(BBoxHead):
         # cnt
         if cnt_score is not None:
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
+            if self.reg_count_strategy and not self.reg_class_agnostic:
+                    cnt_score = cnt_score[torch.arange(labels.size(0)), labels - 1]
             if cnt_score.numel() > 0:
                 loss_cnt_ = self.loss_cnt(
                     cnt_score,
                     counts,
                     count_weights,
-                    avg_factor=avg_cnt_factor,
+                    avg_factor=counts.size(0) if self.reg_count_strategy else avg_cnt_factor,
                     reduction_override=reduction_override)
                 if isinstance(loss_cnt_, dict):
                     losses.update(loss_cnt_)
@@ -885,7 +886,6 @@ class BBoxHeadWithCount(BBoxHead):
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
                     losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
-
         return losses
 
     @force_fp32(apply_to=('cls_score', 'bbox_pred', 'cnt_score'))
@@ -904,11 +904,14 @@ class BBoxHeadWithCount(BBoxHead):
             scores = F.softmax(
                 cls_score, dim=-1) if cls_score is not None else None
 
-        if self.custom_cnt_channels:
-            cnt_scores = self.loss_cnt.get_activation(cnt_score)
+        if self.reg_count_strategy:
+            cnt_scores = cnt_score
         else:
-            cnt_scores = F.softmax(
-                cnt_score, dim=-1) if cnt_score is not None else None
+            if self.custom_cnt_channels:
+                cnt_scores = self.loss_cnt.get_activation(cnt_score)
+            else:
+                cnt_scores = F.softmax(
+                    cnt_score, dim=-1) if cnt_score is not None else None
 
         if bbox_pred is not None:
             bboxes = self.bbox_coder.decode(
@@ -925,11 +928,14 @@ class BBoxHeadWithCount(BBoxHead):
                 bboxes.size()[0], -1)
 
         # Determine the counts for all bboxes.
-        if isinstance(cnt_scores, list):
-            cnt_scores = torch.stack(cnt_scores, dim=0)
-            cnt_scores = torch.sum(cnt_scores, dim=0) / float(len(cnt_scores))
-        cnt_scores, counts = torch.max(cnt_scores, dim=-1)
-        cnt_scores, counts = cnt_scores.unsqueeze(-1), counts.unsqueeze(-1)
+        if self.reg_count_strategy:
+            counts = torch.round(cnt_scores).to(torch.long)
+        else:
+            if isinstance(cnt_scores, list):
+                cnt_scores = torch.stack(cnt_scores, dim=0)
+                cnt_scores = torch.sum(cnt_scores, dim=0) / float(len(cnt_scores))
+            cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+            cnt_scores, counts = cnt_scores.unsqueeze(-1), counts.unsqueeze(-1)
 
         if cfg is None:
             return bboxes, scores, cnt_scores
@@ -937,8 +943,12 @@ class BBoxHeadWithCount(BBoxHead):
             det_bboxes, det_labels, inds = multiclass_nms(bboxes, scores,
                                                           cfg.score_thr, cfg.nms, cfg.max_per_img,
                                                           return_inds=True)
-            det_counts = counts.expand(-1, self.num_classes).reshape(-1)[inds]
-            cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
+            if self.reg_count_strategy and not self.reg_class_agnostic:
+                det_counts = counts.reshape(-1)[inds]
+                cnt_scores = cnt_scores.reshape(-1)[inds]
+            else:
+                det_counts = counts.expand(-1, self.num_classes).reshape(-1)[inds]
+                cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
             det_bboxes = torch.cat([det_bboxes, cnt_scores.unsqueeze(-1)], -1)
             return det_bboxes, det_labels, det_counts
 
@@ -956,7 +966,7 @@ class BBoxHeadWithCount(BBoxHead):
     def div_counts(self, counts):
         if not isinstance(counts, torch.Tensor):
             counts = torch.tensor(counts)
-        if self.base == -1:
+        if self.reg_count_strategy or self.base == -1:
             return counts.to(torch.long)
 
         num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, self.base)))     # e.g. 64 -> 7 digits, rather than 6.

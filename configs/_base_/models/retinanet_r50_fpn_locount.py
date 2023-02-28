@@ -35,6 +35,7 @@ model = dict(
             type='DeltaXYWHBBoxCoder',
             target_means=[.0, .0, .0, .0],
             target_stds=[1.0, 1.0, 1.0, 1.0]),
+        reg_count_strategy=False,
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -46,7 +47,6 @@ model = dict(
             loss_weight=1.0),
         loss_cnt=dict(
             type='CrossEntropyLoss',
-            use_sigmoid=False,
             loss_weight=0.1)),
     # model training and testing settings
     train_cfg=dict(

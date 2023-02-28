@@ -34,6 +34,7 @@ model = dict(
         stacked_convs=4,
         feat_channels=256,
         strides=[8, 16, 32, 64, 128],
+        reg_count_strategy=False,
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -49,7 +50,6 @@ model = dict(
             loss_weight=1.0),
         loss_cnt=dict(
             type='CrossEntropyLoss',
-            use_sigmoid=False,
             loss_weight=0.1)),
     # training and testing settings
     train_cfg=dict(
