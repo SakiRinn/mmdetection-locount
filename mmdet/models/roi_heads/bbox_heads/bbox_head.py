@@ -870,11 +870,14 @@ class BBoxHeadWithCount(BBoxHead):
         # cnt
         if cnt_score is not None:
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
-            if self.reg_count_strategy and not self.reg_class_agnostic:
-                cnt_score = cnt_score[pos_inds.type(torch.bool),
-                                      labels[pos_inds.type(torch.bool)]]
-                counts = counts[pos_inds.type(torch.bool)]
-                count_weights = count_weights[pos_inds.type(torch.bool)]
+            if self.reg_count_strategy:
+                if self.reg_class_agnostic:
+                    cnt_score = cnt_score.squeeze()
+                else:
+                    cnt_score = cnt_score[pos_inds.type(torch.bool),
+                                          labels[pos_inds.type(torch.bool)]]
+                    counts = counts[pos_inds.type(torch.bool)]
+                    count_weights = count_weights[pos_inds.type(torch.bool)]
             if cnt_score.numel() > 0:
                 loss_cnt_ = self.loss_cnt(
                     cnt_score,
