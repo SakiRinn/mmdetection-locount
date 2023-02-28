@@ -48,9 +48,9 @@ model = dict(
             roi_layer=dict(type='RoIAlign', output_size=7, sampling_ratio=0),  # sample_num=2 ?
             out_channels=256,
             featmap_strides=[4, 8, 16, 32]),
-        bbox_head=[
+        bbox_head=[                                     # [CRITICAL] multi-stages for different IoU thrs.
             dict(
-                type='FCBBoxHeadWithCount',
+                type='FCBBoxHeadWithCount',             # 1st stage: same as faster.
                 num_shared_fcs=2,
                 in_channels=256,
                 fc_out_channels=1024,
@@ -61,7 +61,7 @@ model = dict(
                     type='DeltaXYWHBBoxCoder',
                     target_means=[0., 0., 0., 0.],
                     target_stds=[0.1, 0.1, 0.2, 0.2]),
-                reg_class_agnostic=True,
+                reg_class_agnostic=True,                # faster: False.
                 reg_count_strategy=False,
                 loss_cls=dict(
                     type='CrossEntropyLoss',
@@ -73,7 +73,6 @@ model = dict(
                     loss_weight=1.0),
                 loss_cnt=dict(
                     type='CrossEntropyLoss',
-                    use_sigmoid=False,
                     loss_weight=1.0)),
             dict(
                 type='FCBBoxHeadWithCount',
@@ -124,7 +123,6 @@ model = dict(
                     loss_weight=1.0),
                 loss_cnt=dict(
                     type='CrossEntropyLoss',
-                    use_sigmoid=False,
                     loss_weight=1.0))
         ]),
     # model training and testing settings
@@ -143,19 +141,19 @@ model = dict(
                 pos_fraction=0.5,
                 neg_pos_ub=-1,
                 add_gt_as_proposals=False),
-            allowed_border=0,
+            allowed_border=0,                           # faster: -1.
             pos_weight=-1,
             debug=False),
         rpn_proposal=dict(
-            nms_pre=2000,
+            nms_pre=2000,                               # faster: 1000.
             max_per_img=2000,
             nms=dict(type='nms', iou_threshold=0.7),
             min_bbox_size=0),
-        rcnn=[
-            dict(
+        rcnn=[                                          # [CRITICAL] increased IoU thrs (0.5 ~ 0.7)
+            dict(                                       # [CRITICAL] pos & neg same thr, best performance. (experiment)
                 assigner=dict(
                     type='MaxIoUAssignerWithCount',
-                    pos_iou_thr=0.5,
+                    pos_iou_thr=0.5,                    # 1st stage: same as faster.
                     neg_iou_thr=0.5,
                     min_pos_iou=0.5,
                     match_low_quality=False,

@@ -4,12 +4,11 @@ _base_ = [
 model = dict(
     roi_head=dict(
         bbox_head=dict(
-            type='FCBBoxHeadWithCount',
             reg_count_strategy=True,
             loss_cnt=dict(
-                type='L1Loss',
-                loss_weight=0.1
-            )
+                type='SmoothL1Loss',
+                beta=1.0,
+                loss_weight=0.1)
         )
     )
 )
