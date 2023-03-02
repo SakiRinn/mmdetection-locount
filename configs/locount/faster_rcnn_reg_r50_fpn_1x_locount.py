@@ -8,7 +8,7 @@ model = dict(
             loss_cnt=dict(
                 type='SmoothL1Loss',
                 beta=1.0,
-                loss_weight=0.0001)
+                loss_weight=0.1)
         )
     )
 )

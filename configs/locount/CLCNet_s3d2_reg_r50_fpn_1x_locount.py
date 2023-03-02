@@ -3,7 +3,7 @@ _base_ = [
 ]
 model = dict(
     roi_head=dict(
-        count_loss_weights=[0.0001, 0.0001, 0.0001],
+        count_loss_weights=[0.1, 0.1, 0.1],
         bbox_head=[
             dict(
                 type='FCBBoxHeadWithCount',

@@ -890,7 +890,7 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
-                    if not self.reg_count_strategy:
+                    if not self.reg_count_strategy or self.reg_class_agnostic:
                         cnt_score = cnt_score[pos_inds.type(torch.bool)]
                         counts = counts[pos_inds.type(torch.bool)]
                     losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
