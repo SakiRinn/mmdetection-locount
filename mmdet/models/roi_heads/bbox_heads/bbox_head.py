@@ -681,7 +681,7 @@ class BBoxHeadWithCount(BBoxHead):
                 out_features=cls_channels)
         # reg
         if self.with_reg:
-            out_dim_reg = 4 if self.reg_class_agnostic else 4 * num_classes
+            out_dim_reg = 4 if self.reg_class_agnostic else 4 * self.num_classes
             self.fc_reg = build_linear_layer(
                 self.reg_predictor_cfg,
                 in_features=in_channels,
@@ -689,7 +689,7 @@ class BBoxHeadWithCount(BBoxHead):
         # cnt
         if self.with_cnt:
             if self.reg_count_strategy:
-                cnt_channels = 1 if self.reg_class_agnostic else num_classes
+                cnt_channels = 1 if self.reg_class_agnostic else self.num_classes
             else:
                 if self.custom_cnt_channels:
                     cnt_channels = self.loss_cnt.get_cnt_channels(self.coarse_counts)
@@ -872,12 +872,12 @@ class BBoxHeadWithCount(BBoxHead):
             avg_cnt_factor = max(torch.sum(count_weights > 0).float().item(), 1.)
             if self.reg_count_strategy:
                 if self.reg_class_agnostic:
-                    cnt_score = cnt_score.squeeze()
+                    cnt_score = cnt_score.squeeze()[pos_inds.type(torch.bool)]
                 else:
                     cnt_score = cnt_score[pos_inds.type(torch.bool),
                                           labels[pos_inds.type(torch.bool)]]
-                    counts = counts[pos_inds.type(torch.bool)]
-                    count_weights = count_weights[pos_inds.type(torch.bool)]
+                counts = counts[pos_inds.type(torch.bool)]
+                count_weights = count_weights[pos_inds.type(torch.bool)]
             if cnt_score.numel() > 0:
                 loss_cnt_ = self.loss_cnt(
                     cnt_score,
@@ -890,7 +890,7 @@ class BBoxHeadWithCount(BBoxHead):
                 else:
                     losses['loss_cnt'] = loss_cnt_
                 if self.current_stage == self.num_stages - 1:
-                    if not self.reg_count_strategy or self.reg_class_agnostic:
+                    if not self.reg_count_strategy:
                         cnt_score = cnt_score[pos_inds.type(torch.bool)]
                         counts = counts[pos_inds.type(torch.bool)]
                     losses['acc_cnt'] = 100. * cnt_accuracy(cnt_score, counts, reduce_mean=True)
