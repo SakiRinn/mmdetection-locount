@@ -28,7 +28,7 @@ from .panoptic_fpn import PanopticFPN
 from .panoptic_two_stage_segmentor import TwoStagePanopticSegmentor
 from .point_rend import PointRend
 from .queryinst import QueryInst
-from .reppoints_detector import RepPointsDetector
+from .reppoints_detector import RepPointsDetector, RepPointsDetectorWithCount
 from .retinanet import RetinaNet, RetinaNetWithCount
 from .rpn import RPN
 from .scnet import SCNet
@@ -57,5 +57,5 @@ __all__ = [
     'MaskFormer', 'DDOD', 'Mask2Former',
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
     'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
-    'FCOSWithCount'
+    'FCOSWithCount', 'RepPointsDetectorWithCount'
 ]

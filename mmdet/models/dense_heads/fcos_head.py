@@ -456,7 +456,7 @@ class FCOSHead(AnchorFreeHead):
 
 
 @HEADS.register_module()
-class FCOSHeadWithCount(AnchorFreeHeadWithCount):
+class FCOSHeadWithCount(AnchorFreeHeadWithCount, FCOSHead):
 
     def __init__(self,
                  num_classes,
@@ -479,7 +479,7 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount):
                      loss_weight=1.0),
                  loss_cnt=dict(
                      type='CrossEntropyLoss',
-                     use_sigmoid=True,
+                     use_sigmoid=False,
                      loss_weight=1.0),
                  loss_centerness=dict(
                      type='CrossEntropyLoss',
@@ -490,14 +490,15 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount):
                      type='Normal',
                      layer='Conv2d',
                      std=0.01,
-                     override=[dict(type='Normal',
-                                    name='conv_cls',
-                                    std=0.01,
-                                    bias_prob=0.01),
-                               dict(type='Normal',
-                                    name='conv_cnt',
-                                    std=0.01,
-                                    bias_prob=0.01)]),
+                     override=[
+                         dict(type='Normal',
+                              name='conv_cls',
+                              std=0.01,
+                              bias_prob=0.01),
+                         dict(type='Normal',
+                              name='conv_cnt',
+                              std=0.01,
+                              bias_prob=0.01)]),
                  **kwargs):
         self.regress_ranges = regress_ranges
         self.center_sampling = center_sampling

@@ -116,7 +116,7 @@ class RetinaHead(AnchorHead):
 
 
 @HEADS.register_module()
-class RetinaHeadWithCount(AnchorHeadWithCount):
+class RetinaHeadWithCount(AnchorHeadWithCount, RetinaHead):
 
     def __init__(self,
                  num_classes,
