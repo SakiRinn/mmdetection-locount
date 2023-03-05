@@ -2,8 +2,8 @@
 import torch
 
 from ..builder import BBOX_ASSIGNERS
-from .assign_result import AssignResult
-from .base_assigner import BaseAssigner
+from .assign_result import AssignResult, AssignResultWithCount
+from .base_assigner import BaseAssigner, BaseAssignerWithCount
 
 
 @BBOX_ASSIGNERS.register_module()
@@ -132,3 +132,85 @@ class PointAssigner(BaseAssigner):
 
         return AssignResult(
             num_gts, assigned_gt_inds, None, labels=assigned_labels)
+
+
+@BBOX_ASSIGNERS.register_module()
+class PointAssignerWithCount(PointAssigner, BaseAssignerWithCount):
+
+    def __init__(self, scale=4, pos_num=3):
+        super(PointAssignerWithCount, self).__init__(scale, pos_num)
+
+    def assign(self, points, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None, gt_counts=None):
+        num_points = points.shape[0]
+        num_gts = gt_bboxes.shape[0]
+
+        if num_gts == 0 or num_points == 0:
+            assigned_gt_inds = points.new_full((num_points, ),
+                                               0,
+                                               dtype=torch.long)
+            if gt_labels is None:
+                assigned_labels = None
+            else:
+                assigned_labels = points.new_full((num_points, ),
+                                                  -1,
+                                                  dtype=torch.long)
+            if gt_counts is None:
+                assigned_counts = None
+            else:
+                assigned_counts = points.new_full((num_points, ),
+                                                  0,
+                                                  dtype=torch.long)
+            return AssignResultWithCount(
+                num_gts, assigned_gt_inds, None,
+                labels=assigned_labels, counts=assigned_counts)
+
+        points_xy = points[:, :2]
+        points_stride = points[:, 2]
+        points_lvl = torch.log2(points_stride).int()
+        lvl_min, lvl_max = points_lvl.min(), points_lvl.max()
+
+        gt_bboxes_xy = (gt_bboxes[:, :2] + gt_bboxes[:, 2:]) / 2
+        gt_bboxes_wh = (gt_bboxes[:, 2:] - gt_bboxes[:, :2]).clamp(min=1e-6)
+        scale = self.scale
+        gt_bboxes_lvl = ((torch.log2(gt_bboxes_wh[:, 0] / scale) +
+                          torch.log2(gt_bboxes_wh[:, 1] / scale)) / 2).int()
+        gt_bboxes_lvl = torch.clamp(gt_bboxes_lvl, min=lvl_min, max=lvl_max)
+
+        assigned_gt_inds = points.new_zeros((num_points, ), dtype=torch.long)
+        assigned_gt_dist = points.new_full((num_points, ), float('inf'))
+        points_range = torch.arange(points.shape[0])
+
+        for idx in range(num_gts):
+            gt_lvl = gt_bboxes_lvl[idx]
+            lvl_idx = gt_lvl == points_lvl
+            points_index = points_range[lvl_idx]
+            lvl_points = points_xy[lvl_idx, :]
+            gt_point = gt_bboxes_xy[[idx], :]
+            gt_wh = gt_bboxes_wh[[idx], :]
+            points_gt_dist = ((lvl_points - gt_point) / gt_wh).norm(dim=1)
+            min_dist, min_dist_index = torch.topk(
+                points_gt_dist, self.pos_num, largest=False)
+            min_dist_points_index = points_index[min_dist_index]
+            less_than_recorded_index = min_dist < assigned_gt_dist[min_dist_points_index]
+            min_dist_points_index = min_dist_points_index[less_than_recorded_index]
+            assigned_gt_inds[min_dist_points_index] = idx + 1
+            assigned_gt_dist[min_dist_points_index] = min_dist[less_than_recorded_index]
+
+        if gt_labels is not None:
+            assigned_labels = assigned_gt_inds.new_full((num_points, ), -1)
+            pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_labels = None
+        if gt_counts is not None:
+            assigned_counts = assigned_gt_inds.new_full((num_points, ), -1)
+            pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_counts[pos_inds] = gt_counts[assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_counts = None
+
+        return AssignResultWithCount(
+            num_gts, assigned_gt_inds, None,
+            labels=assigned_labels, counts=assigned_counts)

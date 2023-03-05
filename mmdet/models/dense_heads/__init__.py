@@ -27,7 +27,7 @@ from .nasfcos_head import NASFCOSHead
 from .paa_head import PAAHead
 from .pisa_retinanet_head import PISARetinaHead
 from .pisa_ssd_head import PISASSDHead
-from .reppoints_head import RepPointsHead
+from .reppoints_head import RepPointsHead, RepPointsHeadWithCount
 from .retina_head import RetinaHead, RetinaHeadWithCount
 from .retina_sepbn_head import RetinaSepBNHead
 from .rpn_head import RPNHead
@@ -56,5 +56,5 @@ __all__ = [
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
     'AnchorHeadWithCount', 'AnchorFreeHeadWithCount',
-    'RetinaHeadWithCount', 'FCOSHeadWithCount'
+    'RetinaHeadWithCount', 'FCOSHeadWithCount', 'RepPointsHeadWithCount'
 ]

@@ -375,7 +375,7 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
                      loss_weight=1.0),
                  loss_cnt=dict(
                      type='CrossEntropyLoss',
-                     use_sigmoid=True,
+                     use_sigmoid=False,
                      loss_weight=1.0),
                  bbox_coder=dict(type='DistancePointBBoxCoder'),
                  conv_cfg=None,
@@ -386,14 +386,15 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
                      type='Normal',
                      layer='Conv2d',
                      std=0.01,
-                     override=[dict(type='Normal',
-                                    name='conv_cls',
-                                    std=0.01,
-                                    bias_prob=0.01),
-                               dict(type='Normal',
-                                    name='conv_cnt',
-                                    std=0.01,
-                                    bias_prob=0.01)])):
+                     override=[
+                         dict(type='Normal',
+                              name='conv_cls',
+                              std=0.01,
+                              bias_prob=0.01),
+                         dict(type='Normal',
+                              name='conv_cnt',
+                              std=0.01,
+                              bias_prob=0.01)])):
         super(AnchorFreeHead, self).__init__(init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
@@ -406,7 +407,10 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
             self.cls_out_channels = num_classes
         else:
             self.cls_out_channels = num_classes + 1
-        self.cnt_out_channels = num_counts + 1          # count: idx to real.
+        if self.use_sigmoid_cnt:
+            self.cnt_out_channels = num_counts
+        else:
+            self.cnt_out_channels = num_counts + 1
 
         self.stacked_convs = stacked_convs
         self.strides = strides
@@ -499,7 +503,7 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
                                       error_msgs)
 
     def forward(self, feats):
-        return multi_apply(self.forward_single, feats)[:2]
+        return multi_apply(self.forward_single, feats)[:3]
 
     def forward_single(self, x):
         cls_feat = x
