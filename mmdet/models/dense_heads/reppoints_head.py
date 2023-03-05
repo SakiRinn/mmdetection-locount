@@ -787,9 +787,13 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                      use_sigmoid=False,
                      loss_weight=1.0),
                  loss_bbox_init=dict(
-                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=0.5),
+                     type='SmoothL1Loss',
+                     beta=1.0 / 9.0,
+                     loss_weight=0.5),
                  loss_bbox_refine=dict(
-                     type='SmoothL1Loss', beta=1.0 / 9.0, loss_weight=1.0),
+                     type='SmoothL1Loss',
+                     beta=1.0 / 9.0,
+                     loss_weight=1.0),
                  use_grid_points=False,
                  center_init=True,
                  transform_method='moment',
@@ -851,7 +855,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             if self.sampling and hasattr(self.train_cfg, 'sampler'):
                 sampler_cfg = self.train_cfg.sampler
             else:
-                sampler_cfg = dict(type='PseudoSampler')
+                sampler_cfg = dict(type='PseudoSamplerWithCount')       # change the default sampler (pesudo).
             self.sampler = build_sampler(sampler_cfg, context=self)
 
         self.transform_method = transform_method
@@ -879,6 +883,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         self.cnt_convs = nn.ModuleList()
+
         for i in range(self.stacked_convs):
             chn = self.in_channels if i == 0 else self.feat_channels
             self.cls_convs.append(
@@ -908,24 +913,29 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                     padding=1,
                     conv_cfg=self.conv_cfg,
                     norm_cfg=self.norm_cfg))
+
         pts_out_dim = 4 if self.use_grid_points else 2 * self.num_points
+        # cls
         self.reppoints_cls_conv = DeformConv2d(self.feat_channels,
                                                self.point_feat_channels,
                                                self.dcn_kernel, 1,
                                                self.dcn_pad)
         self.reppoints_cls_out = nn.Conv2d(self.point_feat_channels,
                                            self.cls_out_channels, 1, 1, 0)
+        # cnt
         self.reppoints_cnt_conv = DeformConv2d(self.feat_channels,
                                                self.point_feat_channels,
                                                self.dcn_kernel, 1,
                                                self.dcn_pad)
         self.reppoints_cnt_out = nn.Conv2d(self.point_feat_channels,
                                            self.cnt_out_channels, 1, 1, 0)
+        # pts_init
         self.reppoints_pts_init_conv = nn.Conv2d(self.feat_channels,
                                                  self.point_feat_channels, 3,
                                                  1, 1)
         self.reppoints_pts_init_out = nn.Conv2d(self.point_feat_channels,
                                                 pts_out_dim, 1, 1, 0)
+        # pts_refine
         self.reppoints_pts_refine_conv = DeformConv2d(self.feat_channels,
                                                       self.point_feat_channels,
                                                       self.dcn_kernel, 1,
@@ -984,9 +994,6 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         else:
             return cls_out, cnt_out, self.points2bbox(pts_out_refine)
 
-    def get_points(self, featmap_sizes, img_metas, device):
-        return super(AnchorFreeHeadWithCount, self).get_points(featmap_sizes, img_metas, device)
-
     def _point_target_single(self,
                              flat_proposals,
                              valid_flags,
@@ -1010,8 +1017,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         assign_result = assigner.assign(proposals, gt_bboxes, gt_bboxes_ignore,
                                         None if self.sampling else gt_labels,
                                         None if self.sampling else gt_counts)
-        sampling_result = self.sampler.sample(assign_result, proposals,
-                                              gt_bboxes)
+        sampling_result = self.sampler.sample(assign_result, proposals, gt_bboxes)
 
         num_valid_proposals = proposals.shape[0]
         bbox_gt = proposals.new_zeros([num_valid_proposals, 4])
@@ -1020,10 +1026,12 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         labels = proposals.new_full((num_valid_proposals, ),
                                     self.num_classes,
                                     dtype=torch.long)
+        label_weights = proposals.new_zeros(
+            num_valid_proposals, dtype=torch.float)
         counts = proposals.new_full((num_valid_proposals, ),
                                     0,
                                     dtype=torch.long)
-        label_weights = proposals.new_zeros(
+        count_weights = proposals.new_zeros(
             num_valid_proposals, dtype=torch.float)
 
         pos_inds = sampling_result.pos_inds
@@ -1045,10 +1053,13 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                     sampling_result.pos_assigned_gt_inds]
             if pos_weight <= 0:
                 label_weights[pos_inds] = 1.0
+                count_weights[pos_inds] = 1.0
             else:
                 label_weights[pos_inds] = pos_weight
+                count_weights[pos_inds] = pos_weight
         if len(neg_inds) > 0:
             label_weights[neg_inds] = 1.0
+            count_weights[neg_inds] = 1.0
 
         if unmap_outputs:
             num_total_proposals = flat_proposals.size(0)
@@ -1216,10 +1227,8 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             num_total_pos_init +
             num_total_neg_init if self.sampling else num_total_pos_init)
 
-        center_list, valid_flag_list = self.get_points(featmap_sizes,
-                                                       img_metas, device)
-        pts_coordinate_preds_refine = self.offset_to_pts(
-            center_list, pts_preds_refine)
+        center_list, valid_flag_list = self.get_points(featmap_sizes, img_metas, device)
+        pts_coordinate_preds_refine = self.offset_to_pts(center_list, pts_preds_refine)
         bbox_list = []
         for i_img, center in enumerate(center_list):
             bbox = []
