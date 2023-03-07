@@ -817,7 +817,6 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         self.use_grid_points = use_grid_points
         self.center_init = center_init
 
-        # we use deform conv to extract points features
         self.dcn_kernel = int(np.sqrt(num_points))
         self.dcn_pad = int((self.dcn_kernel - 1) / 2)
         assert self.dcn_kernel * self.dcn_kernel == num_points, \
@@ -832,7 +831,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             (-1))
         self.dcn_base_offset = torch.tensor(dcn_base_offset).view(1, -1, 1, 1)
 
-        super().__init__(
+        super(RepPointsHeadWithCount, self).__init__(
             num_classes,
             num_counts,
             in_channels,
@@ -855,7 +854,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             if self.sampling and hasattr(self.train_cfg, 'sampler'):
                 sampler_cfg = self.train_cfg.sampler
             else:
-                sampler_cfg = dict(type='PseudoSamplerWithCount')       # change the default sampler (pesudo).
+                sampler_cfg = dict(type='PseudoSamplerWithCount')       # change the default sampler (pseudo).
             self.sampler = build_sampler(sampler_cfg, context=self)
 
         self.transform_method = transform_method
@@ -1184,6 +1183,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             bbox_gt_refine / normalize_term,
             bbox_weights_refine,
             avg_factor=num_total_samples_refine)
+
         return loss_cls, loss_cnt, loss_pts_init, loss_pts_refine
 
     def loss(self,
@@ -1199,13 +1199,12 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         device = cls_scores[0].device
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
-        # count_channels = self.cnt_out_channels if self.use_sigmoid_cnt else 1
 
         center_list, valid_flag_list = self.get_points(featmap_sizes,
                                                        img_metas, device)
         pts_coordinate_preds_init = self.offset_to_pts(center_list,
                                                        pts_preds_init)
-        if self.train_cfg.init.assigner['type'] == 'PointAssigner':
+        if self.train_cfg.init.assigner['type'] == 'PointAssignerWithCount':
             candidate_list = center_list
         else:
             bbox_list = self.centers_to_bboxes(center_list)
@@ -1282,7 +1281,6 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         }
         return loss_dict_all
 
-    # Same as base_dense_head/_get_bboxes_single except self._bbox_decode
     def _get_bboxes_single(self,
                            cls_score_list,
                            bbox_pred_list,
@@ -1347,9 +1345,9 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         return self._bbox_post_process(
             mlvl_scores,
             mlvl_labels,
-            mlvl_bboxes,
             mlvl_cnt_scores,
             mlvl_counts,
+            mlvl_bboxes,
             img_meta['scale_factor'],
             cfg,
             rescale=rescale,

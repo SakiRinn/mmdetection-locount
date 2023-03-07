@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/coco_LHC.py',
-    '../_base_/schedules/schedule_1x.py',
+    '../_base_/schedules/schedule_1x_old.py',
     '../_base_/default_runtime.py'
 ]
 model = dict(
@@ -42,6 +42,7 @@ model = dict(
             loss_weight=1.0),
         loss_cnt=dict(
             type='CrossEntropyLoss',
+            # use_sigmoid=False,
             loss_weight=0.1),
         loss_bbox_init=dict(
             type='SmoothL1Loss',
