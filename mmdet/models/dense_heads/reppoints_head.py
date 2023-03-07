@@ -1141,9 +1141,9 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
     def loss_single(self, cls_score, pts_pred_init, pts_pred_refine, cnt_score,
                     labels, label_weights,
                     bbox_gt_init, bbox_weights_init,
-                    bbox_gt_refine, bbox_weights_refine, stride,
+                    bbox_gt_refine, bbox_weights_refine,
                     counts, count_weights,
-                    num_total_samples_init, num_total_samples_refine):
+                    stride, num_total_samples_init, num_total_samples_refine):
         # cls
         labels = labels.reshape(-1)
         label_weights = label_weights.reshape(-1)
