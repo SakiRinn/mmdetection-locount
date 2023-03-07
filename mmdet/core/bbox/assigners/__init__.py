@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .approx_max_iou_assigner import ApproxMaxIoUAssigner
-from .assign_result import AssignResult
+from .assign_result import AssignResult, AssignResultWithCount
 from .atss_assigner import ATSSAssigner
 from .base_assigner import BaseAssigner, BaseAssignerWithCount
 from .center_region_assigner import CenterRegionAssigner
@@ -18,6 +18,6 @@ __all__ = [
     'BaseAssigner', 'MaxIoUAssigner', 'ApproxMaxIoUAssigner', 'AssignResult',
     'PointAssigner', 'ATSSAssigner', 'CenterRegionAssigner', 'GridAssigner',
     'HungarianAssigner', 'RegionAssigner', 'UniformAssigner', 'SimOTAAssigner',
-    'TaskAlignedAssigner', 'MaskHungarianAssigner',
+    'TaskAlignedAssigner', 'MaskHungarianAssigner', 'AssignResultWithCount',
     'BaseAssignerWithCount', 'MaxIoUAssignerWithCount', 'PointAssignerWithCount'
 ]
