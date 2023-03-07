@@ -782,10 +782,6 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                      gamma=2.0,
                      alpha=0.25,
                      loss_weight=1.0),
-                 loss_cnt=dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid=False,
-                     loss_weight=1.0),
                  loss_bbox_init=dict(
                      type='SmoothL1Loss',
                      beta=1.0 / 9.0,
@@ -793,6 +789,10 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                  loss_bbox_refine=dict(
                      type='SmoothL1Loss',
                      beta=1.0 / 9.0,
+                     loss_weight=1.0),
+                 loss_cnt=dict(
+                     type='CrossEntropyLoss',
+                     use_sigmoid=False,
                      loss_weight=1.0),
                  use_grid_points=False,
                  center_init=True,
@@ -989,9 +989,9 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             pts_out_refine = pts_out_refine + pts_out_init.detach()
 
         if self.training:
-            return cls_out, cnt_out, pts_out_init, pts_out_refine
+            return cls_out, pts_out_init, pts_out_refine, cnt_out
         else:
-            return cls_out, cnt_out, self.points2bbox(pts_out_refine)
+            return cls_out, self.points2bbox(pts_out_refine), cnt_out
 
     def _point_target_single(self,
                              flat_proposals,
@@ -1070,8 +1070,10 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             pos_proposals       = unmap(pos_proposals, num_total_proposals, inside_flags)
             proposals_weights   = unmap(proposals_weights, num_total_proposals, inside_flags)
 
-        return (labels, label_weights, counts, count_weights, bbox_gt, pos_proposals,
-                proposals_weights, pos_inds, neg_inds)
+        return (labels, label_weights,
+                counts, count_weights,
+                bbox_gt, pos_proposals, proposals_weights,
+                pos_inds, neg_inds)
 
     def get_targets(self,
                     proposals_list,
@@ -1101,8 +1103,10 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             gt_labels_list = [None for _ in range(num_imgs)]
         if gt_counts_list is None:
             gt_counts_list = [None for _ in range(num_imgs)]
-        (all_labels, all_label_weights, all_counts, all_count_weights, all_bbox_gt, all_proposals,
-         all_proposal_weights, pos_inds_list, neg_inds_list) = multi_apply(
+        (all_labels, all_label_weights,
+         all_counts, all_count_weights,
+         all_bbox_gt, all_proposals, all_proposal_weights,
+         pos_inds_list, neg_inds_list) = multi_apply(
              self._point_target_single,
              proposals_list,
              valid_flag_list,
@@ -1134,11 +1138,11 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                 bbox_gt_list, proposals_list, proposal_weights_list,
                 num_total_pos, num_total_neg)
 
-    def loss_single(self, cls_score, cnt_score, pts_pred_init, pts_pred_refine,
+    def loss_single(self, cls_score, pts_pred_init, pts_pred_refine, cnt_score,
                     labels, label_weights,
-                    counts, count_weights,
                     bbox_gt_init, bbox_weights_init,
                     bbox_gt_refine, bbox_weights_refine, stride,
+                    counts, count_weights,
                     num_total_samples_init, num_total_samples_refine):
         # cls
         labels = labels.reshape(-1)
@@ -1184,13 +1188,13 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             bbox_weights_refine,
             avg_factor=num_total_samples_refine)
 
-        return loss_cls, loss_cnt, loss_pts_init, loss_pts_refine
+        return loss_cls, loss_pts_init, loss_pts_refine, loss_cnt
 
     def loss(self,
              cls_scores,
-             cnt_scores,
              pts_preds_init,
              pts_preds_refine,
+             cnt_scores,
              gt_bboxes,
              gt_labels,
              gt_counts,
@@ -1250,34 +1254,35 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             gt_counts_list=gt_counts,
             stage='refine',
             label_channels=label_channels)
-        (labels_list, label_weights_list, counts_list, count_weights_list,
+        (labels_list, label_weights_list,
+         counts_list, count_weights_list,
          bbox_gt_list_refine, candidate_list_refine, bbox_weights_list_refine,
          num_total_pos_refine, num_total_neg_refine) = cls_reg_cnt_targets_refine
         num_total_samples_refine = (num_total_pos_refine + num_total_neg_refine \
                                     if self.sampling else num_total_pos_refine)
 
-        losses_cls, losses_cnt, losses_pts_init, losses_pts_refine = multi_apply(
+        losses_cls, losses_pts_init, losses_pts_refine, losses_cnt = multi_apply(
             self.loss_single,
             cls_scores,
-            cnt_scores,
             pts_coordinate_preds_init,
             pts_coordinate_preds_refine,
+            cnt_scores,
             labels_list,
             label_weights_list,
-            counts_list,
-            count_weights_list,
             bbox_gt_list_init,
             bbox_weights_list_init,
             bbox_gt_list_refine,
             bbox_weights_list_refine,
+            counts_list,
+            count_weights_list,
             self.point_strides,
             num_total_samples_init=num_total_samples_init,
             num_total_samples_refine=num_total_samples_refine)
         loss_dict_all = {
             'loss_cls': losses_cls,
-            'loss_cnt': losses_cnt,
             'loss_pts_init': losses_pts_init,
-            'loss_pts_refine': losses_pts_refine
+            'loss_pts_refine': losses_pts_refine,
+            'loss_cnt': losses_cnt
         }
         return loss_dict_all
 
