@@ -653,7 +653,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             if self.use_sigmoid_cnt:
                 cnt_scores = cnt_score.sigmoid()
             else:
-                cnt_scores = cnt_score.softmax(-1)[:, :-1]
+                cnt_scores = cnt_score.softmax(-1)[:, 1:]       # XXX: Set back [:, :-1] ?
 
             results = filter_scores_and_topk(
                 scores, cfg.score_thr, nms_pre,
@@ -665,6 +665,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
 
             # Determine the counts for all bboxes.
             cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+            counts = counts + 1                                 # After excluding BG, fix all count indices.
             cnt_scores, counts = cnt_scores[keep_idxs], counts[keep_idxs]
 
             if with_score_factors:

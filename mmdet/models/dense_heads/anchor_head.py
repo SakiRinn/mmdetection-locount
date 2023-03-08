@@ -3,6 +3,7 @@ import warnings
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mmcv.runner import force_fp32
 
 from mmdet.core import (anchor_inside_flags, build_assigner, build_bbox_coder,
@@ -696,7 +697,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
                                   dtype=torch.long)
         label_weights = anchors.new_zeros(num_valid_anchors, dtype=torch.float)
         counts = anchors.new_full((num_valid_anchors, ),
-                                  0,                    # No count, corresponding to bg(num_classes).
+                                  0,                    # No count, corresponding to BG (num_classes).
                                   dtype=torch.long)
         count_weights = anchors.new_zeros(num_valid_anchors, dtype=torch.float)
 
@@ -830,6 +831,10 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
         counts = counts.reshape(-1)
         count_weights = count_weights.reshape(-1)
         cnt_score = cnt_score.permute(0, 2, 3, 1).reshape(-1, self.cnt_out_channels)
+        # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
+        if self.use_sigmoid_cnt:
+            counts = F.one_hot(counts, num_classes=self.num_counts + 1)
+            counts = counts[:, 0:]
         loss_cnt = self.loss_cnt(
             cnt_score, counts, count_weights, avg_factor=num_total_samples)
         # bbox

@@ -2,6 +2,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mmcv.cnn import ConvModule
 from mmcv.ops import DeformConv2d
 
@@ -1161,6 +1162,10 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         cnt_score = cnt_score.permute(0, 2, 3,
                                       1).reshape(-1, self.cnt_out_channels)
         cnt_score = cnt_score.contiguous()
+        # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
+        if self.use_sigmoid_cnt:
+            counts = F.one_hot(counts, num_classes=self.num_counts + 1)
+            counts = counts[:, 0:]
         loss_cnt = self.loss_cnt(
             cnt_score,
             counts,
@@ -1323,7 +1328,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             if self.use_sigmoid_cnt:
                 cnt_scores = cnt_score.sigmoid()
             else:
-                cnt_scores = cnt_score.softmax(-1)[:, :-1]
+                cnt_scores = cnt_score.softmax(-1)[:, 1:]       # XXX: Set back [:, :-1] ?
 
             results = filter_scores_and_topk(
                 scores, cfg.score_thr, nms_pre,
@@ -1335,6 +1340,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
 
             # Determine the counts for all bboxes.
             cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+            counts = counts + 1                                 # After excluding BG, fix all cnt idxs.
             cnt_scores, counts = cnt_scores[keep_idxs], counts[keep_idxs]
 
             bboxes = self._bbox_decode(priors, bbox_pred,
