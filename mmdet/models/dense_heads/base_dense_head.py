@@ -665,7 +665,7 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
 
             # Determine the counts for all bboxes.
             cnt_scores, counts = torch.max(cnt_scores, dim=-1)
-            counts = counts + 1                                 # After excluding BG, fix all cnt idxs.
+            counts = counts + 1                                 # After excluding BG, fix all count indices.
             cnt_scores, counts = cnt_scores[keep_idxs], counts[keep_idxs]
 
             if with_score_factors:

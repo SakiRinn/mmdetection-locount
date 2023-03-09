@@ -3,6 +3,7 @@ import warnings
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mmcv.cnn import Scale
 from mmcv.runner import force_fp32
 
@@ -586,6 +587,10 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount, FCOSHead):
         flatten_bbox_targets = torch.cat(bbox_targets)
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
+        # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
+        if self.use_sigmoid_cnt:
+            flatten_counts = F.one_hot(flatten_counts, num_classes=self.num_counts + 1)
+            flatten_counts = flatten_counts[:, 0:]
 
         bg_class_ind = self.num_classes
         pos_inds = ((flatten_labels >= 0)
@@ -742,9 +747,9 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount, FCOSHead):
         min_area, min_area_inds = areas.min(dim=1)
 
         labels = gt_labels[min_area_inds]
-        labels[min_area == INF] = self.num_classes  # set as BG
+        labels[min_area == INF] = self.num_classes      # set as BG
         counts = gt_counts[min_area_inds]
-        counts[min_area == INF] = self.num_counts   # set as 0 corresponding to BG
+        counts[min_area == INF] = 0                     # set as 0 corresponding to BG
         bbox_targets = bbox_targets[range(num_points), min_area_inds]
 
         return bbox_targets, labels, counts
