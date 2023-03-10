@@ -493,18 +493,17 @@ class CocoDataset(CustomDataset):
             # mapping of cocoEval.stats
             coco_metric_names = {
                 'mAP': 0,
-                'mAP@150': 1,
-                'mAP_50': 2,
-                'mAP_75': 3,
-                'mAP_s': 4,
-                'mAP_m': 5,
-                'mAP_l': 6,
-                'AR@100': 7,
-                'AR@300': 8,
-                'AR@1000': 9,
-                'AR_s@1000': 10,
-                'AR_m@1000': 11,
-                'AR_l@1000': 12
+                'mAP_50': 1,
+                'mAP_75': 2,
+                'mAP_s': 3,
+                'mAP_m': 4,
+                'mAP_l': 5,
+                'AR@150': 6,
+                'AR@300': 7,
+                'AR@1000': 8,
+                'AR_s@1000': 9,
+                'AR_m@1000': 10,
+                'AR_l@1000': 11
             }
             if metric_items is not None:
                 for metric_item in metric_items:
@@ -526,7 +525,7 @@ class CocoDataset(CustomDataset):
 
                 if metric_items is None:
                     metric_items = [
-                        'AR@100', 'AR@300', 'AR@1000', 'AR_s@1000',
+                        'AR@150', 'AR@300', 'AR@1000', 'AR_s@1000',
                         'AR_m@1000', 'AR_l@1000'
                     ]
 
@@ -580,7 +579,7 @@ class CocoDataset(CustomDataset):
 
                 if metric_items is None:
                     metric_items = [
-                        'mAP', 'mAP@150', 'mAP_50', 'mAP_75',
+                        'mAP', 'mAP_50', 'mAP_75',
                         'mAP_s', 'mAP_m', 'mAP_l'
                     ]
 

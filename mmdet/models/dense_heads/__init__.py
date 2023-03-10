@@ -8,8 +8,8 @@ from .centernet_head import CenterNetHead
 from .centripetal_head import CentripetalHead
 from .corner_head import CornerHead
 from .ddod_head import DDODHead
-from .deformable_detr_head import DeformableDETRHead
-from .detr_head import DETRHead
+from .deformable_detr_head import DeformableDETRHead, DeformableDETRHeadWithCount
+from .detr_head import DETRHead, DETRHeadWithCount
 from .embedding_rpn_head import EmbeddingRPNHead
 from .fcos_head import FCOSHead, FCOSHeadWithCount
 from .fovea_head import FoveaHead
@@ -56,5 +56,6 @@ __all__ = [
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
     'AnchorHeadWithCount', 'AnchorFreeHeadWithCount',
-    'RetinaHeadWithCount', 'FCOSHeadWithCount', 'RepPointsHeadWithCount'
+    'RetinaHeadWithCount', 'FCOSHeadWithCount', 'RepPointsHeadWithCount',
+    'DETRHeadWithCount', 'DeformableDETRHeadWithCount'
 ]

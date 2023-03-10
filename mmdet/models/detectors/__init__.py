@@ -6,8 +6,8 @@ from .cascade_rcnn import CascadeRCNN, CascadeRCNNWithCount
 from .centernet import CenterNet
 from .cornernet import CornerNet
 from .ddod import DDOD
-from .deformable_detr import DeformableDETR
-from .detr import DETR
+from .deformable_detr import DeformableDETR, DeformableDETRWithCount
+from .detr import DETR, DETRWithCount
 from .fast_rcnn import FastRCNN
 from .faster_rcnn import FasterRCNN, FasterRCNNWithCount
 from .fcos import FCOS, FCOSWithCount
@@ -57,5 +57,6 @@ __all__ = [
     'MaskFormer', 'DDOD', 'Mask2Former',
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
     'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
-    'FCOSWithCount', 'RepPointsDetectorWithCount'
+    'FCOSWithCount', 'RepPointsDetectorWithCount', 'DETRWithCount',
+    'DeformableDETRWithCount'
 ]

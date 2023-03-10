@@ -529,7 +529,7 @@ class BaseDenseHead(BaseModule, metaclass=ABCMeta):
 class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
 
     def __init__(self, init_cfg=None):
-        super(BaseDenseHeadWithCount, self).__init__(init_cfg)
+        super(BaseDenseHead, self).__init__(init_cfg)
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'cnt_scores'))
     def get_bboxes(self,
@@ -686,8 +686,10 @@ class BaseDenseHeadWithCount(BaseDenseHead, metaclass=ABCMeta):
             if with_cnt_score_factors:
                 mlvl_cnt_score_factors.append(cnt_score_factor)
 
-        return self._bbox_post_process(mlvl_scores, mlvl_labels, mlvl_cnt_scores, mlvl_counts, mlvl_bboxes,
-                                       img_meta['scale_factor'], cfg, rescale, with_nms, mlvl_score_factors, **kwargs)
+        return self._bbox_post_process(mlvl_scores, mlvl_labels,
+                                       mlvl_cnt_scores, mlvl_counts, mlvl_bboxes,
+                                       img_meta['scale_factor'], cfg, rescale,
+                                       with_nms, mlvl_score_factors, **kwargs)
 
     def _bbox_post_process(self,
                            mlvl_scores,
