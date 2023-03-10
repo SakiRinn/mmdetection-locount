@@ -949,6 +949,7 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
 
         self.num_query = num_query
         self.num_classes = num_classes
+        self.num_counts = num_counts
         self.in_channels = in_channels
         self.num_reg_fcs = num_reg_fcs
         self.train_cfg = train_cfg
@@ -1333,6 +1334,6 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
         det_bboxes[:, 1::2].clamp_(min=0, max=img_shape[0])
         if rescale:
             det_bboxes /= det_bboxes.new_tensor(scale_factor)
-        det_bboxes = torch.cat((det_bboxes, scores.unsqueeze(1)), -1)
+        det_bboxes = torch.cat((det_bboxes, scores.unsqueeze(-1), cnt_scores.unsqueeze(-1)), -1)
 
         return det_bboxes, det_labels, det_counts
