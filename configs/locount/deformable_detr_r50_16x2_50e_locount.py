@@ -85,12 +85,11 @@ model = dict(
     # training and testing settings
     train_cfg=dict(
         assigner=dict(
-            type='HungarianAssigner',
-            # type='HungarianAssignerWithCount',
-            # cnt_cost=dict(type='ClassificationCost',
-            #               weight=0.1),
+            type='HungarianAssignerWithCount',
             cls_cost=dict(type='FocalLossCost',
                           weight=2.0),
+            cnt_cost=dict(type='ClassificationCost',
+                          weight=0.1),
             reg_cost=dict(type='BBoxL1Cost',
                           box_format='xywh',
                           weight=5.0),
