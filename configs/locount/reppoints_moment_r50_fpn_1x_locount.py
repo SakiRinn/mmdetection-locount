@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/coco_LHC.py',
-    '../_base_/schedules/schedule_1x_old.py',
+    '../_base_/schedules/schedule_1x.py',
     '../_base_/default_runtime.py'
 ]
 model = dict(
@@ -50,7 +50,7 @@ model = dict(
             loss_weight=1.0),
         loss_cnt=dict(
             type='CrossEntropyLoss',
-            loss_weight=0.05),
+            loss_weight=0.1),
         transform_method='moment'),
     # training and testing settings
     train_cfg=dict(
@@ -79,3 +79,4 @@ model = dict(
         nms=dict(type='nms', iou_threshold=0.5),
         max_per_img=100))
 optimizer = dict(lr=0.01)
+optimizer_config = dict(_delete_=True, grad_clip=dict(max_norm=35, norm_type=2))    # MUST! otherwise loss NaN.

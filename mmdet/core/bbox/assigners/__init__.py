@@ -5,7 +5,7 @@ from .atss_assigner import ATSSAssigner
 from .base_assigner import BaseAssigner, BaseAssignerWithCount
 from .center_region_assigner import CenterRegionAssigner
 from .grid_assigner import GridAssigner
-from .hungarian_assigner import HungarianAssigner
+from .hungarian_assigner import HungarianAssigner, HungarianAssignerWithCount
 from .mask_hungarian_assigner import MaskHungarianAssigner
 from .max_iou_assigner import MaxIoUAssigner, MaxIoUAssignerWithCount
 from .point_assigner import PointAssigner, PointAssignerWithCount
@@ -18,6 +18,7 @@ __all__ = [
     'BaseAssigner', 'MaxIoUAssigner', 'ApproxMaxIoUAssigner', 'AssignResult',
     'PointAssigner', 'ATSSAssigner', 'CenterRegionAssigner', 'GridAssigner',
     'HungarianAssigner', 'RegionAssigner', 'UniformAssigner', 'SimOTAAssigner',
-    'TaskAlignedAssigner', 'MaskHungarianAssigner', 'AssignResultWithCount',
-    'BaseAssignerWithCount', 'MaxIoUAssignerWithCount', 'PointAssignerWithCount'
+    'TaskAlignedAssigner', 'MaskHungarianAssigner',
+    'AssignResultWithCount', 'BaseAssignerWithCount',
+    'MaxIoUAssignerWithCount', 'PointAssignerWithCount', 'HungarianAssignerWithCount'
 ]

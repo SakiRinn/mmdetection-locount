@@ -4,7 +4,7 @@ import warnings
 import torch
 
 from ..builder import DETECTORS
-from .single_stage import SingleStageDetector
+from .single_stage import SingleStageDetector, SingleStageDetectorWithCount
 
 
 @DETECTORS.register_module()
@@ -68,3 +68,27 @@ class DETR(SingleStageDetector):
         det_bboxes, det_labels = self.bbox_head.onnx_export(*outs, img_metas)
 
         return det_bboxes, det_labels
+
+
+@DETECTORS.register_module()
+class DETRWithCount(SingleStageDetectorWithCount, DETR):
+
+    def __init__(self,
+                 backbone,
+                 bbox_head,
+                 train_cfg=None,
+                 test_cfg=None,
+                 pretrained=None,
+                 init_cfg=None):
+        super(DETRWithCount, self).__init__(backbone, None, bbox_head, train_cfg,
+                                            test_cfg, pretrained, init_cfg)
+
+    def onnx_export(self, img, img_metas):
+        x = self.extract_feat(img)
+        outs = self.bbox_head.forward_onnx(x, img_metas)
+        img_shape = torch._shape_as_tensor(img)[2:]
+        img_metas[0]['img_shape_for_onnx'] = img_shape
+
+        det_bboxes, det_labels, det_counts = self.bbox_head.onnx_export(*outs, img_metas)
+
+        return det_bboxes, det_labels, det_counts

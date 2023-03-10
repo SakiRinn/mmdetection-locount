@@ -587,7 +587,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
                      type='Normal',
                      layer='Conv2d',
                      std=0.01)):
-        super(AnchorHead, self).__init__(init_cfg)
+        super(AnchorHeadWithCount, self).__init__(init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.num_counts = num_counts
@@ -620,7 +620,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
             self.assigner = build_assigner(self.train_cfg.assigner)
             if hasattr(self.train_cfg,
                        'sampler') and self.train_cfg.sampler.type.split(
-                           '.')[-1] != 'PseudoSampler':
+                           '.')[-1] != 'PseudoSamplerWithCount':
                 self.sampling = True
                 sampler_cfg = self.train_cfg.sampler
                 # avoid BC-breaking
@@ -633,10 +633,10 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
                         'your config when using `FocalLoss`, `GHMC`, '
                         '`QualityFocalLoss` or other FocalLoss variant.')
                     self.sampling = False
-                    sampler_cfg = dict(type='PseudoSampler')
+                    sampler_cfg = dict(type='PseudoSamplerWithCount')
             else:
                 self.sampling = False
-                sampler_cfg = dict(type='PseudoSampler')
+                sampler_cfg = dict(type='PseudoSamplerWithCount')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self.fp16_enabled = False
 
@@ -834,7 +834,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
         if self.use_sigmoid_cnt:
             counts = F.one_hot(counts, num_classes=self.num_counts + 1)
-            counts = counts[:, 0:]
+            counts = counts[:, 1:]
         loss_cnt = self.loss_cnt(
             cnt_score, counts, count_weights, avg_factor=num_total_samples)
         # bbox

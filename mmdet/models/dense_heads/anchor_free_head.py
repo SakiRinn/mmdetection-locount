@@ -395,7 +395,7 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
                               name='conv_cnt',
                               std=0.01,
                               bias_prob=0.01)])):
-        super(AnchorFreeHead, self).__init__(init_cfg)
+        super(AnchorFreeHeadWithCount, self).__init__(init_cfg)
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.num_counts = num_counts
@@ -527,6 +527,7 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
     def loss(self,
              cls_scores,
              bbox_preds,
+             cnt_scores,
              gt_bboxes,
              gt_labels,
              gt_counts,

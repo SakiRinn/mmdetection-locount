@@ -5,8 +5,8 @@ from scipy.optimize import linear_sum_assignment
 from ..builder import BBOX_ASSIGNERS
 from ..match_costs import build_match_cost
 from ..transforms import bbox_cxcywh_to_xyxy
-from .assign_result import AssignResult
-from .base_assigner import BaseAssigner
+from .assign_result import AssignResult, AssignResultWithCount
+from .base_assigner import BaseAssigner, BaseAssignerWithCount
 
 
 @BBOX_ASSIGNERS.register_module()
@@ -137,3 +137,83 @@ class HungarianAssigner(BaseAssigner):
         assigned_labels[matched_row_inds] = gt_labels[matched_col_inds]
         return AssignResult(
             num_gts, assigned_gt_inds, None, labels=assigned_labels)
+
+
+@BBOX_ASSIGNERS.register_module()
+class HungarianAssignerWithCount(BaseAssignerWithCount):
+
+    def __init__(self,
+                 cls_cost=dict(type='ClassificationCost', weight=1.),
+                 reg_cost=dict(type='BBoxL1Cost', weight=1.),
+                 iou_cost=dict(type='IoUCost', iou_mode='giou', weight=1.),
+                 cnt_cost=dict(type='ClassificationCost', weight=1.)):
+        self.cls_cost = build_match_cost(cls_cost)
+        self.reg_cost = build_match_cost(reg_cost)
+        self.iou_cost = build_match_cost(iou_cost)
+        self.cnt_cost = build_match_cost(cnt_cost)
+
+    def assign(self,
+               bbox_pred,
+               cls_pred,
+               cnt_pred,
+               gt_bboxes,
+               gt_labels,
+               gt_counts,
+               img_meta,
+               gt_bboxes_ignore=None,
+               eps=1e-7):
+        assert gt_bboxes_ignore is None, \
+            'Only case when gt_bboxes_ignore is None is supported.'
+        num_gts, num_bboxes = gt_bboxes.size(0), bbox_pred.size(0)
+
+        # 1. Init to -1 (don't care)
+        assigned_gt_inds = bbox_pred.new_full((num_bboxes, ),
+                                              -1,
+                                              dtype=torch.long)
+        assigned_labels = bbox_pred.new_full((num_bboxes, ),
+                                             -1,
+                                             dtype=torch.long)
+        assigned_counts = bbox_pred.new_full((num_bboxes, ),
+                                             -1,
+                                             dtype=torch.long)
+        if num_gts == 0 or num_bboxes == 0:
+            if num_gts == 0:
+                assigned_gt_inds[:] = 0
+            return AssignResultWithCount(
+                num_gts, assigned_gt_inds, None,
+                labels=assigned_labels, counts=assigned_counts)
+
+        img_h, img_w, _ = img_meta['img_shape']
+        factor = gt_bboxes.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+
+        # 2. Calculate Cost
+        # (1) classification cost
+        cls_cost = self.cls_cost(cls_pred, gt_labels)
+        cnt_cost = self.cnt_cost(cnt_pred, gt_counts)
+        # (2) regression L1 cost
+        normalize_gt_bboxes = gt_bboxes / factor
+        reg_cost = self.reg_cost(bbox_pred, normalize_gt_bboxes)
+        # (3) regression iou cost
+        bboxes = bbox_cxcywh_to_xyxy(bbox_pred) * factor
+        iou_cost = self.iou_cost(bboxes, gt_bboxes)
+        # (4) weighted sum
+        cost = cls_cost + cnt_cost + reg_cost + iou_cost
+
+        # 3. Hungarian Match
+        cost = cost.detach().cpu()
+        matched_row_inds, matched_col_inds = linear_sum_assignment(cost)
+        matched_row_inds = torch.from_numpy(matched_row_inds).to(
+            bbox_pred.device)
+        matched_col_inds = torch.from_numpy(matched_col_inds).to(
+            bbox_pred.device)
+
+        # 4. Post Process
+        # (1) assign BG (label=0)
+        assigned_gt_inds[:] = 0
+        # (2) assign FG (object)
+        assigned_gt_inds[matched_row_inds] = matched_col_inds + 1
+        assigned_labels[matched_row_inds] = gt_labels[matched_col_inds]
+        assigned_counts[matched_row_inds] = gt_counts[matched_col_inds]
+        return AssignResultWithCount(
+            num_gts, assigned_gt_inds, None,
+            labels=assigned_labels, counts=assigned_counts)
