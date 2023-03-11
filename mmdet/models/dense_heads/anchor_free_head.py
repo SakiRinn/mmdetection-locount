@@ -527,6 +527,7 @@ class AnchorFreeHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, An
     def loss(self,
              cls_scores,
              bbox_preds,
+             cnt_scores,
              gt_bboxes,
              gt_labels,
              gt_counts,

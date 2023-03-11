@@ -1086,6 +1086,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                     gt_counts_list=None,
                     stage='init',
                     label_channels=1,
+                    count_channels=1,
                     unmap_outputs=True):
         assert stage in ['init', 'refine']
         num_imgs = len(img_metas)
@@ -1208,6 +1209,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         device = cls_scores[0].device
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
+        count_channels = self.cnt_out_channels if self.use_sigmoid_cnt else 1
 
         center_list, valid_flag_list = self.get_points(featmap_sizes,
                                                        img_metas, device)
@@ -1228,7 +1230,8 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             gt_labels_list=gt_labels,
             gt_counts_list=gt_counts,
             stage='init',
-            label_channels=label_channels)
+            label_channels=label_channels,
+            count_channels=count_channels)
         (*_, bbox_gt_list_init, candidate_list_init, bbox_weights_list_init,
          num_total_pos_init, num_total_neg_init) = cls_reg_cnt_targets_init
         num_total_samples_init = (
@@ -1258,7 +1261,8 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
             gt_labels_list=gt_labels,
             gt_counts_list=gt_counts,
             stage='refine',
-            label_channels=label_channels)
+            label_channels=label_channels,
+            count_channels=count_channels)
         (labels_list, label_weights_list,
          counts_list, count_weights_list,
          bbox_gt_list_refine, candidate_list_refine, bbox_weights_list_refine,

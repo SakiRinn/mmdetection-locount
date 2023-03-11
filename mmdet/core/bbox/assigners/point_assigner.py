@@ -158,7 +158,7 @@ class PointAssignerWithCount(PointAssigner, BaseAssignerWithCount):
                 assigned_counts = None
             else:
                 assigned_counts = points.new_full((num_points, ),
-                                                  0,
+                                                  -1,
                                                   dtype=torch.long)
             return AssignResultWithCount(
                 num_gts, assigned_gt_inds, None,

@@ -620,7 +620,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
             self.assigner = build_assigner(self.train_cfg.assigner)
             if hasattr(self.train_cfg,
                        'sampler') and self.train_cfg.sampler.type.split(
-                           '.')[-1] != 'PseudoSampler':
+                           '.')[-1] != 'PseudoSamplerWithCount':
                 self.sampling = True
                 sampler_cfg = self.train_cfg.sampler
                 # avoid BC-breaking
@@ -633,10 +633,10 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
                         'your config when using `FocalLoss`, `GHMC`, '
                         '`QualityFocalLoss` or other FocalLoss variant.')
                     self.sampling = False
-                    sampler_cfg = dict(type='PseudoSampler')
+                    sampler_cfg = dict(type='PseudoSamplerWithCount')
             else:
                 self.sampling = False
-                sampler_cfg = dict(type='PseudoSampler')
+                sampler_cfg = dict(type='PseudoSamplerWithCount')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self.fp16_enabled = False
 

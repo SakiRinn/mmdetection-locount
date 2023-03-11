@@ -496,10 +496,10 @@ class StandardRoIHeadWithCount(BBoxTestMixinWithCount, StandardRoIHead):
         """Async test without augmentation."""
         assert self.with_bbox, 'Bbox head must be implemented.'
 
-        det_bboxes, det_labels = await self.async_test_bboxes(
+        det_bboxes, det_labels, det_counts = await self.async_test_bboxes(
             x, img_metas, proposal_list, self.test_cfg, rescale=rescale)
-        bbox_results = bbox2result(det_bboxes, det_labels,
-                                   self.bbox_head.num_classes)
+        bbox_results = bbox2result_with_count(det_bboxes, det_labels, det_counts,
+                                              self.bbox_head.num_classes, self.bbox_head.num_counts)
         if not self.with_mask:
             return bbox_results
         else:
