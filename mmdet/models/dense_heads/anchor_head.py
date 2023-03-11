@@ -834,7 +834,7 @@ class AnchorHeadWithCount(BaseDenseHeadWithCount, BBoxTestMixinWithCount, Anchor
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
         if self.use_sigmoid_cnt:
             counts = F.one_hot(counts, num_classes=self.num_counts + 1)
-            counts = counts[:, 0:]
+            counts = counts[:, 1:]
         loss_cnt = self.loss_cnt(
             cnt_score, counts, count_weights, avg_factor=num_total_samples)
         # bbox

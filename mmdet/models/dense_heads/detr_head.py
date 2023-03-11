@@ -1139,7 +1139,7 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
         if self.loss_cnt.use_sigmoid:
             counts = F.one_hot(counts, num_classes=self.num_counts + 1)
-            counts = counts[:, 0:]
+            counts = counts[:, 1:]
         loss_cls = self.loss_cls(
             cls_scores, labels, label_weights, avg_factor=cls_avg_factor)
         loss_cnt = self.loss_cnt(

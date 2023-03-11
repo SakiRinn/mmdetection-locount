@@ -590,7 +590,7 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount, FCOSHead):
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
         if self.use_sigmoid_cnt:
             flatten_counts = F.one_hot(flatten_counts, num_classes=self.num_counts + 1)
-            flatten_counts = flatten_counts[:, 0:]
+            flatten_counts = flatten_counts[:, 1:]
 
         bg_class_ind = self.num_classes
         pos_inds = ((flatten_labels >= 0)
