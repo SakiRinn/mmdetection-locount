@@ -1319,13 +1319,16 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
             det_labels = det_labels[bbox_index]
         # cnt
         if self.loss_cnt.use_sigmoid:
-            cnt_score = cnt_score.sigmoid()
-            cnt_scores, counts = cnt_score.view(-1).topk(max_per_img)
-            det_counts = counts[bbox_index]
+            cnt_scores = cnt_score.sigmoid()
         else:
-            cnt_scores, det_counts = F.softmax(cnt_score, dim=-1)[..., 1:].max(-1)      # exclude 0
-            cnt_scores = cnt_scores[bbox_index]
-            det_counts = det_counts[bbox_index]
+            cnt_scores = cnt_score.softmax(-1)[..., 1:]                                 # exclude 0
+        # NOTE: Determine the counts for all bboxes.
+        cnt_scores, counts = torch.max(cnt_scores, dim=-1)
+        counts = counts + 1
+        cnt_scores, counts = cnt_scores[..., None], counts[..., None]
+        # NOTE: Use label indices to get corresponding counts.
+        cnt_scores = cnt_scores.expand(-1, self.num_classes).view(-1)[indexes]
+        det_counts = counts.expand(-1, self.num_classes).view(-1)[indexes]
 
         det_bboxes = bbox_cxcywh_to_xyxy(bbox_pred)
         det_bboxes[:, 0::2] = det_bboxes[:, 0::2] * img_shape[1]
