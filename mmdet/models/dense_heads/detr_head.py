@@ -1327,8 +1327,8 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
         counts = counts + 1
         cnt_scores, counts = cnt_scores[..., None], counts[..., None]
         # NOTE: Use label indices to get corresponding counts.
-        cnt_scores = cnt_scores.expand(-1, self.num_classes).view(-1)[indexes]
-        det_counts = counts.expand(-1, self.num_classes).view(-1)[indexes]
+        cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[indexes]
+        det_counts = counts.expand(-1, self.num_classes).reshape(-1)[indexes]
 
         det_bboxes = bbox_cxcywh_to_xyxy(bbox_pred)
         det_bboxes[:, 0::2] = det_bboxes[:, 0::2] * img_shape[1]

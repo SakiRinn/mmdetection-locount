@@ -957,8 +957,8 @@ class BBoxHeadWithCount(BBoxHead):
                 det_counts = counts.reshape(-1)[inds]
                 cnt_scores = cnt_scores.reshape(-1)[inds]
             else:
-                det_counts = counts.expand(-1, self.num_classes).view(-1)[inds]
-                cnt_scores = cnt_scores.expand(-1, self.num_classes).view(-1)[inds]
+                det_counts = counts.expand(-1, self.num_classes).reshape(-1)[inds]
+                cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
             det_bboxes = torch.cat([det_bboxes, cnt_scores.unsqueeze(-1)], -1)
             return det_bboxes, det_labels, det_counts
 
