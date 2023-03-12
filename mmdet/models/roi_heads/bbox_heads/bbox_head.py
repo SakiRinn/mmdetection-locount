@@ -936,7 +936,7 @@ class BBoxHeadWithCount(BBoxHead):
             bboxes = (bboxes.view(bboxes.size(0), -1, 4) / scale_factor).view(
                 bboxes.size()[0], -1)
 
-        # Determine the counts for all bboxes.
+        # NOTE: Determine the counts for all bboxes.
         if self.reg_count_strategy:
             counts = torch.round(cnt_scores).to(torch.long)
         else:
@@ -944,7 +944,7 @@ class BBoxHeadWithCount(BBoxHead):
                 cnt_scores = torch.stack(cnt_scores, dim=0)
                 cnt_scores = torch.sum(cnt_scores, dim=0) / float(len(cnt_scores))
             cnt_scores, counts = torch.max(cnt_scores, dim=-1)
-            cnt_scores, counts = cnt_scores.unsqueeze(-1), counts.unsqueeze(-1)
+            cnt_scores, counts = cnt_scores[..., None], counts[..., None]
 
         if cfg is None:
             return bboxes, scores, cnt_scores
@@ -952,6 +952,7 @@ class BBoxHeadWithCount(BBoxHead):
             det_bboxes, det_labels, inds = multiclass_nms(bboxes, scores,
                                                           cfg.score_thr, cfg.nms, cfg.max_per_img,
                                                           return_inds=True)
+            # NOTE: Use label indices to get corresponding counts.
             if self.reg_count_strategy and not self.reg_class_agnostic:
                 det_counts = counts.reshape(-1)[inds]
                 cnt_scores = cnt_scores.reshape(-1)[inds]
@@ -960,17 +961,6 @@ class BBoxHeadWithCount(BBoxHead):
                 cnt_scores = cnt_scores.expand(-1, self.num_classes).reshape(-1)[inds]
             det_bboxes = torch.cat([det_bboxes, cnt_scores.unsqueeze(-1)], -1)
             return det_bboxes, det_labels, det_counts
-
-    # def init_weights(self):
-    #     if self.with_cls:
-    #         nn.init.normal_(self.fc_cls.weight, 0, 0.01)
-    #         nn.init.constant_(self.fc_cls.bias, 0)
-    #     if self.with_reg:
-    #         nn.init.normal_(self.fc_reg.weight, 0, 0.001)
-    #         nn.init.constant_(self.fc_reg.bias, 0)
-    #     if self.with_cnt:
-    #         nn.init.normal_(self.fc_cnt.weight, 0, 0.001)
-    #         nn.init.constant_(self.fc_cnt.bias, 0)
 
     def div_counts(self, counts):
         if not isinstance(counts, torch.Tensor):
