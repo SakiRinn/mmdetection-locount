@@ -588,7 +588,7 @@ class FCOSHeadWithCount(AnchorFreeHeadWithCount, FCOSHead):
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
-        if self.use_sigmoid_cnt:
+        if self.use_sigmoid_cnt and self.loss_cnt.__class__.__name__ != 'FocalLoss':
             flatten_counts = F.one_hot(flatten_counts, num_classes=self.num_counts + 1)
             flatten_counts = flatten_counts[:, 1:]
 

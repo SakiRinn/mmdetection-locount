@@ -1137,7 +1137,7 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
         cnt_avg_factor = max(cnt_avg_factor, 1)
 
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
-        if self.loss_cnt.use_sigmoid:
+        if self.loss_cnt.use_sigmoid and self.loss_cnt.__class__.__name__ != 'FocalLoss':
             counts = F.one_hot(counts, num_classes=self.num_counts + 1)
             counts = counts[:, 1:]
         loss_cls = self.loss_cls(

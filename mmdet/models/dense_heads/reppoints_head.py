@@ -1164,7 +1164,7 @@ class RepPointsHeadWithCount(AnchorFreeHeadWithCount, RepPointsHead):
                                       1).reshape(-1, self.cnt_out_channels)
         cnt_score = cnt_score.contiguous()
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
-        if self.use_sigmoid_cnt:
+        if self.use_sigmoid_cnt and self.loss_cnt.__class__.__name__ != 'FocalLoss':
             counts = F.one_hot(counts, num_classes=self.num_counts + 1)
             counts = counts[:, 1:]
         loss_cnt = self.loss_cnt(
