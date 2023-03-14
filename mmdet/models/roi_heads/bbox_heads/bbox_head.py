@@ -716,7 +716,7 @@ class BBoxHeadWithCount(BBoxHead):
     def coarse_counts(self):
         if self.base == -1:
             return self.num_counts + 1
-        num_digits = math.ceil(math.log(self.num_counts - 1, self.base))        # e.g. 64 -> 7 digits, rather than 6.
+        num_digits = math.ceil(math.log(self.num_counts + 1, self.base))        # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         return self.base**(num_digits - stg_digits*(self.num_stages - self.current_stage - 1))
 
@@ -968,7 +968,7 @@ class BBoxHeadWithCount(BBoxHead):
         if self.reg_count_strategy or self.base == -1:
             return counts.to(torch.long)
 
-        num_digits = math.ceil(math.ceil(math.log(self.num_counts - 1, self.base)))     # e.g. 64 -> 7 digits, rather than 6.
+        num_digits = math.ceil(math.log(self.num_counts + 1, self.base))        # e.g. 64 -> 7 digits, rather than 6.
         stg_digits = math.ceil(num_digits / self.num_stages)
         interval = self.base**(stg_digits*(self.num_stages - self.current_stage - 1))
         # e.g. For 3 stages: 6 digits -> 2|2|2, 7 digits -> 1|3|3. For last stage, counts=2**3=8.

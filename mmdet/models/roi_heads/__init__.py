@@ -20,7 +20,7 @@ from .roi_extractors import (BaseRoIExtractor, GenericRoIExtractor,
                              SingleRoIExtractor)
 from .scnet_roi_head import SCNetRoIHead
 from .shared_heads import ResLayer
-from .sparse_roi_head import SparseRoIHead
+from .sparse_roi_head import SparseRoIHead, SparseRoIHeadWithCount
 from .standard_roi_head import StandardRoIHead, StandardRoIHeadWithCount
 from .trident_roi_head import TridentRoIHead
 
@@ -36,5 +36,5 @@ __all__ = [
     'SCNetRoIHead', 'SCNetMaskHead', 'SCNetSemanticHead', 'SCNetBBoxHead',
     'FeatureRelayHead', 'GlobalContextHead',
     'CascadeRoIHeadWithCount', 'BBoxHeadWithCount', 'FCBBoxHeadWithCount',
-    'StandardRoIHeadWithCount'
+    'StandardRoIHeadWithCount', 'SparseRoIHeadWithCount'
 ]

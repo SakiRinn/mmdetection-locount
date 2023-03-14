@@ -2,10 +2,10 @@
 import numpy as np
 import torch
 
-from mmdet.core import bbox2result, bbox2roi, bbox_xyxy_to_cxcywh
-from mmdet.core.bbox.samplers import PseudoSampler
+from mmdet.core import bbox2result, bbox2result_with_count, bbox2roi, bbox_xyxy_to_cxcywh
+from mmdet.core.bbox.samplers import PseudoSampler, PseudoSamplerWithCount
 from ..builder import HEADS
-from .cascade_roi_head import CascadeRoIHead
+from .cascade_roi_head import CascadeRoIHead, CascadeRoIHeadWithCount
 
 
 @HEADS.register_module()
@@ -422,3 +422,278 @@ class SparseRoIHead(CascadeRoIHead):
                         stage, x, rois, bbox_results['attn_feats'])
                     all_stage_bbox_results[-1] += (mask_results, )
         return all_stage_bbox_results
+
+
+@HEADS.register_module()
+class SparseRoIHeadWithCount(CascadeRoIHeadWithCount, SparseRoIHead):
+
+    def __init__(self,
+                 num_stages=6,
+                 stage_loss_weights=(1, 1, 1, 1, 1, 1),
+                 count_loss_weights=(0.1, 0.1, 0.1, 0.1, 0.1, 0.1),
+                 proposal_feature_channel=256,
+                 bbox_roi_extractor=dict(
+                     type='SingleRoIExtractor',
+                     roi_layer=dict(
+                         type='RoIAlign', output_size=7, sampling_ratio=2),
+                     out_channels=256,
+                     featmap_strides=[4, 8, 16, 32]),
+                 mask_roi_extractor=None,
+                 bbox_head=dict(
+                     type='DIIHeadWithCount',
+                     num_classes=140,
+                     num_counts=56,
+                     num_fcs=2,
+                     num_heads=8,
+                     num_cls_fcs=1,
+                     num_reg_fcs=3,
+                     num_cnt_fcs=1,
+                     feedforward_channels=2048,
+                     hidden_channels=256,
+                     dropout=0.0,
+                     roi_feat_size=7,
+                     ffn_act_cfg=dict(type='ReLU', inplace=True)),
+                 mask_head=None,
+                 train_cfg=None,
+                 test_cfg=None,
+                 pretrained=None,
+                 init_cfg=None):
+        assert bbox_roi_extractor is not None
+        assert bbox_head is not None
+        assert len(stage_loss_weights) == num_stages
+
+        self.num_stages = num_stages
+        self.stage_loss_weights = stage_loss_weights
+        self.count_loss_weights = count_loss_weights
+        self.proposal_feature_channel = proposal_feature_channel
+
+        super(SparseRoIHeadWithCount, self).__init__(
+            num_stages,
+            stage_loss_weights,
+            count_loss_weights,
+            bbox_roi_extractor=bbox_roi_extractor,
+            mask_roi_extractor=mask_roi_extractor,
+            bbox_head=bbox_head,
+            mask_head=mask_head,
+            train_cfg=train_cfg,
+            test_cfg=test_cfg,
+            pretrained=pretrained,
+            init_cfg=init_cfg)
+
+        if train_cfg is not None:
+            for stage in range(num_stages):
+                assert isinstance(self.bbox_sampler[stage], PseudoSamplerWithCount), \
+                    'Sparse R-CNN and QueryInst only support `PseudoSampler`'
+
+    def _bbox_forward(self, stage, x, rois, object_feats, img_metas):
+        num_imgs = len(img_metas)
+        bbox_roi_extractor = self.bbox_roi_extractor[stage]
+        bbox_head = self.bbox_head[stage]
+        bbox_feats = bbox_roi_extractor(x[:bbox_roi_extractor.num_inputs],
+                                        rois)
+        cls_score, bbox_pred, cnt_score, object_feats, attn_feats = bbox_head(
+            bbox_feats, object_feats)
+        proposal_list = self.bbox_head[stage].refine_bboxes(
+            rois,
+            rois.new_zeros(len(rois)),
+            bbox_pred.view(-1, bbox_pred.size(-1)),
+            [rois.new_zeros(object_feats.size(1)) for _ in range(num_imgs)],
+            img_metas)
+        bbox_results = dict(
+            cls_score=cls_score,
+            cnt_score=cnt_score,
+            decode_bbox_pred=torch.cat(proposal_list),
+            object_feats=object_feats,
+            attn_feats=attn_feats,
+            detach_cls_score_list=[
+                cls_score[i].detach() for i in range(num_imgs)
+            ],
+            detach_cnt_score_list=[
+                cnt_score[i].detach() for i in range(num_imgs)
+            ],
+            detach_proposal_list=[item.detach() for item in proposal_list])
+
+        return bbox_results
+
+    def forward_train(self,
+                      x,
+                      proposal_boxes,
+                      proposal_features,
+                      img_metas,
+                      gt_bboxes,
+                      gt_labels,
+                      gt_counts,
+                      gt_bboxes_ignore=None,
+                      imgs_whwh=None,
+                      gt_masks=None):
+        num_imgs = len(img_metas)
+        num_proposals = proposal_boxes.size(1)
+        imgs_whwh = imgs_whwh.repeat(1, num_proposals, 1)
+        all_stage_bbox_results = []
+        proposal_list = [proposal_boxes[i] for i in range(len(proposal_boxes))]
+        object_feats = proposal_features
+        all_stage_loss = {}
+        for stage in range(self.num_stages):
+            rois = bbox2roi(proposal_list)
+            bbox_results = self._bbox_forward(stage, x, rois, object_feats,
+                                              img_metas)
+            all_stage_bbox_results.append(bbox_results)
+            if gt_bboxes_ignore is None:
+                gt_bboxes_ignore = [None for _ in range(num_imgs)]
+            sampling_results = []
+            cls_pred_list = bbox_results['detach_cls_score_list']
+            cnt_pred_list = bbox_results['detach_cnt_score_list']
+            proposal_list = bbox_results['detach_proposal_list']
+            for i in range(num_imgs):
+                normalize_bbox_ccwh = bbox_xyxy_to_cxcywh(proposal_list[i] /
+                                                          imgs_whwh[i])
+                assign_result = self.bbox_assigner[stage].assign(
+                    normalize_bbox_ccwh, cls_pred_list[i], cnt_pred_list[i],
+                    gt_bboxes[i], gt_labels[i], gt_counts[i], img_metas[i])
+                sampling_result = self.bbox_sampler[stage].sample(
+                    assign_result, proposal_list[i], gt_bboxes[i])
+                sampling_results.append(sampling_result)
+            bbox_targets = self.bbox_head[stage].get_targets(
+                sampling_results, gt_bboxes, gt_labels, gt_counts,
+                self.train_cfg[stage], True)
+            cls_score = bbox_results['cls_score']
+            decode_bbox_pred = bbox_results['decode_bbox_pred']
+            cnt_score = bbox_results['cnt_score']
+
+            single_stage_loss = self.bbox_head[stage].loss(
+                cls_score.view(-1, cls_score.size(-1)),
+                decode_bbox_pred.view(-1, 4),
+                cnt_score.view(-1, cnt_score.size(-1)),
+                *bbox_targets,
+                imgs_whwh=imgs_whwh)
+
+            if self.with_mask:
+                mask_results = self._mask_forward_train(
+                    stage, x, bbox_results['attn_feats'], sampling_results,
+                    gt_masks, self.train_cfg[stage])
+                single_stage_loss['loss_mask'] = mask_results['loss_mask']
+
+            for key, value in single_stage_loss.items():
+                if key.find('acc') != -1:
+                    continue
+                if key.endswith('_cnt'):
+                    all_stage_loss[f'stage{stage}_{key}'] = value * self.count_loss_weights[stage]
+                else:
+                    all_stage_loss[f'stage{stage}_{key}'] = value * self.stage_loss_weights[stage]
+            object_feats = bbox_results['object_feats']
+
+        return all_stage_loss
+
+    def simple_test(self,
+                    x,
+                    proposal_boxes,
+                    proposal_features,
+                    img_metas,
+                    imgs_whwh,
+                    rescale=False):
+        assert self.with_bbox, 'Bbox head must be implemented.'
+        num_imgs = len(img_metas)
+        proposal_list = [proposal_boxes[i] for i in range(num_imgs)]
+        ori_shapes = tuple(meta['ori_shape'] for meta in img_metas)
+        scale_factors = tuple(meta['scale_factor'] for meta in img_metas)
+
+        object_feats = proposal_features
+        if all([proposal.shape[0] == 0 for proposal in proposal_list]):
+            bbox_results = [[
+                [np.zeros((0, 6), dtype=np.float32) for i in range(self.bbox_head[-1].num_counts + 1)] \
+                for j in range(self.bbox_head[-1].num_classes)
+            ]] * num_imgs
+            return bbox_results
+
+        for stage in range(self.num_stages):
+            rois = bbox2roi(proposal_list)
+            bbox_results = self._bbox_forward(stage, x, rois, object_feats,
+                                              img_metas)
+            object_feats = bbox_results['object_feats']
+            cls_score = bbox_results['cls_score']
+            cnt_score = bbox_results['cnt_score']
+            proposal_list = bbox_results['detach_proposal_list']
+
+        if self.with_mask:
+            rois = bbox2roi(proposal_list)
+            mask_results = self._mask_forward(stage, x, rois,
+                                              bbox_results['attn_feats'])
+            mask_results['mask_pred'] = mask_results['mask_pred'].reshape(
+                num_imgs, -1, *mask_results['mask_pred'].size()[1:])
+
+        num_classes = self.bbox_head[-1].num_classes
+        num_counts  = self.bbox_head[-1].num_counts
+        det_bboxes = []
+        det_labels = []
+        det_counts = []
+
+        if self.bbox_head[-1].loss_cls.use_sigmoid:
+            cls_score = cls_score.sigmoid()
+        else:
+            cls_score = cls_score.softmax(-1)[..., :-1]
+        if self.bbox_head[-1].loss_cnt.use_sigmoid:
+            cnt_score = cnt_score.sigmoid()
+        else:
+            cnt_score = cnt_score.softmax(-1)[..., 1:]
+
+        for img_id in range(num_imgs):
+            # cls
+            cls_score_per_img = cls_score[img_id]
+            scores_per_img, topk_indices = cls_score_per_img.flatten(
+                0, 1).topk(
+                    self.test_cfg.max_per_img, sorted=False)
+            labels_per_img = topk_indices % num_classes
+            bbox_pred_per_img = proposal_list[img_id][topk_indices // num_classes]
+            # cnt
+            cnt_score_per_img = cnt_score[img_id]
+            # NOTE: Determine the counts for all bboxes.
+            cnt_scores_per_img, counts_per_img = torch.max(cnt_score_per_img, dim=-1)
+            counts_per_img = counts_per_img + 1
+            cnt_scores_per_img, counts_per_img = cnt_scores_per_img[..., None], counts_per_img[..., None]
+            # NOTE: Use label indices to get corresponding counts.
+            cnt_scores_per_img = cnt_scores_per_img.expand(-1, self.num_classes).reshape(-1)[topk_indices]
+            counts_per_img = counts_per_img.expand(-1, self.num_classes).reshape(-1)[topk_indices]
+
+            if rescale:
+                scale_factor = img_metas[img_id]['scale_factor']
+                bbox_pred_per_img /= bbox_pred_per_img.new_tensor(scale_factor)
+            det_bboxes.append(
+                torch.cat([bbox_pred_per_img, scores_per_img[:, None], cnt_scores_per_img[:, None]], dim=1))
+            det_labels.append(labels_per_img)
+            det_counts.append(counts_per_img)
+
+        bbox_results = [
+            bbox2result_with_count(det_bboxes[i], det_labels[i], det_counts[i], num_classes, num_counts)
+            for i in range(num_imgs)
+        ]
+
+        if self.with_mask:
+            if rescale and not isinstance(scale_factors[0], float):
+                scale_factors = [
+                    torch.from_numpy(scale_factor).to(det_bboxes[0].device)
+                    for scale_factor in scale_factors
+                ]
+            _bboxes = [
+                det_bboxes[i][:, :4] *
+                scale_factors[i] if rescale else det_bboxes[i][:, :4]
+                for i in range(len(det_bboxes))
+            ]
+            segm_results = []
+            mask_pred = mask_results['mask_pred']
+            for img_id in range(num_imgs):
+                mask_pred_per_img = mask_pred[img_id].flatten(0,
+                                                              1)[topk_indices]
+                mask_pred_per_img = mask_pred_per_img[:, None, ...].repeat(
+                    1, num_classes, 1, 1)
+                segm_result = self.mask_head[-1].get_seg_masks(
+                    mask_pred_per_img, _bboxes[img_id], det_labels[img_id],
+                    self.test_cfg, ori_shapes[img_id], scale_factors[img_id],
+                    rescale)
+                segm_results.append(segm_result)
+
+        if self.with_mask:
+            results = list(zip(bbox_results, segm_results))
+        else:
+            results = bbox_results
+
+        return results
