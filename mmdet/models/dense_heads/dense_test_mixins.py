@@ -230,25 +230,34 @@ class BBoxTestMixinWithCount(BBoxTestMixin):
                 cfg=self.test_cfg,
                 rescale=False,
                 with_nms=False)[0]
-            aug_bboxes.append(bbox_outputs[0])
-            aug_scores.append(bbox_outputs[1])
-            if len(bbox_outputs) >= 3:
+            if len(bbox_outputs) > 3:
+                aug_bboxes.append(bbox_outputs[0])
+                aug_scores.append(bbox_outputs[1])
                 aug_labels.append(bbox_outputs[2])
+                aug_cnt_scores.append(bbox_outputs[3])
+                aug_counts.append(bbox_outputs[4])
+            else:
+                aug_bboxes.append(bbox_outputs[0])
+                aug_scores.append(bbox_outputs[1])
+                aug_cnt_scores.append(bbox_outputs[2])
 
-        merged_bboxes, merged_scores = self.merge_aug_bboxes(
-            aug_bboxes, aug_scores, img_metas)
+
+        merged_bboxes, merged_scores, merged_cnt_scores = self.merge_aug_bboxes(
+            aug_bboxes, aug_scores, aug_cnt_scores, img_metas)
         merged_labels = torch.cat(aug_labels, dim=0) if aug_labels else None
+        merged_counts = torch.cat(aug_counts, dim=0) if aug_counts else None
 
         if merged_bboxes.numel() == 0:
-            det_bboxes = torch.cat([merged_bboxes, merged_scores[:, None]], -1)
+            det_bboxes = torch.cat([merged_bboxes, merged_scores[:, None], merged_cnt_scores[:, None]], -1)
             return [
-                (det_bboxes, merged_labels),
+                (det_bboxes, merged_labels, merged_counts),
             ]
 
         det_bboxes, keep_idxs = batched_nms(merged_bboxes, merged_scores,
                                             merged_labels, self.test_cfg.nms)
         det_bboxes = det_bboxes[:self.test_cfg.max_per_img]
         det_labels = merged_labels[keep_idxs][:self.test_cfg.max_per_img]
+        det_counts = merged_counts[keep_idxs][:self.test_cfg.max_per_img]
 
         if rescale:
             _det_bboxes = det_bboxes
@@ -258,7 +267,7 @@ class BBoxTestMixinWithCount(BBoxTestMixin):
                 img_metas[0][0]['scale_factor'])
 
         return [
-            (_det_bboxes, det_labels),
+            (_det_bboxes, det_labels, det_counts),
         ]
 
     def merge_aug_bboxes(self, aug_bboxes, aug_scores, aug_cnt_scores, img_metas):

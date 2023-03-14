@@ -135,14 +135,15 @@ def bbox2result(bboxes, labels, num_classes):
 
 def bbox2result_with_count(bboxes, labels, counts, num_classes, num_counts):
     if bboxes.shape[0] == 0:
-        return [np.zeros((0, 5), dtype=np.float32) for i in range(num_classes)]
+        return [[np.zeros((0, 6), dtype=np.float32)
+                 for i in range(num_counts + 1)] for j in range(num_classes)]
     else:
         if isinstance(bboxes, torch.Tensor):
             bboxes = bboxes.detach().cpu().numpy()
             labels = labels.detach().cpu().numpy()
             counts = counts.detach().cpu().numpy()
         return [[bboxes[np.logical_and(counts == i, labels == j), :]
-                for i in range(num_counts + 1)] for j in range(num_classes)]    # count: idx to real
+                 for i in range(num_counts + 1)] for j in range(num_classes)]
 
 
 def distance2bbox(points, distance, max_shape=None):

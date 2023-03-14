@@ -9,9 +9,9 @@ from mmcv.runner import auto_fp16, force_fp32
 from mmdet.core import multi_apply
 from mmdet.models.builder import HEADS, build_loss
 from mmdet.models.dense_heads.atss_head import reduce_mean
-from mmdet.models.losses import accuracy
+from mmdet.models.losses import accuracy, cnt_accuracy
 from mmdet.models.utils import build_transformer
-from .bbox_head import BBoxHead
+from .bbox_head import BBoxHead, BBoxHeadWithCount
 
 
 @HEADS.register_module()
@@ -424,3 +424,295 @@ class DIIHead(BBoxHead):
             bbox_targets = torch.cat(bbox_targets, 0)
             bbox_weights = torch.cat(bbox_weights, 0)
         return labels, label_weights, bbox_targets, bbox_weights
+
+
+@HEADS.register_module()
+class DIIHeadWithCount(BBoxHeadWithCount):
+
+    def __init__(self,
+                 num_classes=140,
+                 num_counts=56,
+                 num_ffn_fcs=2,
+                 num_heads=8,
+                 num_cls_fcs=1,
+                 num_reg_fcs=3,
+                 num_cnt_fcs=1,
+                 feedforward_channels=2048,
+                 in_channels=256,
+                 dropout=0.0,
+                 ffn_act_cfg=dict(type='ReLU', inplace=True),
+                 dynamic_conv_cfg=dict(
+                     type='DynamicConv',
+                     in_channels=256,
+                     feat_channels=64,
+                     out_channels=256,
+                     input_feat_shape=7,
+                     act_cfg=dict(type='ReLU', inplace=True),
+                     norm_cfg=dict(type='LN')),
+                 loss_iou=dict(
+                     type='GIoULoss',
+                     loss_weight=2.0),
+                 init_cfg=None,
+                 **kwargs):
+        assert init_cfg is None, 'To prevent abnormal initialization ' \
+                                 'behavior, init_cfg is not allowed to be set'
+        super(DIIHeadWithCount, self).__init__(
+            num_classes=num_classes,
+            num_counts=num_counts,
+            reg_decoded_bbox=True,
+            reg_class_agnostic=True,
+            init_cfg=init_cfg,
+            **kwargs)
+
+        self.loss_iou = build_loss(loss_iou)
+        self.in_channels = in_channels
+        self.fp16_enabled = False
+        self.attention = MultiheadAttention(in_channels, num_heads, dropout)
+        self.attention_norm = build_norm_layer(dict(type='LN'), in_channels)[1]
+
+        self.instance_interactive_conv = build_transformer(dynamic_conv_cfg)
+        self.instance_interactive_conv_dropout = nn.Dropout(dropout)
+        self.instance_interactive_conv_norm = build_norm_layer(
+            dict(type='LN'), in_channels)[1]
+
+        self.ffn = FFN(
+            in_channels,
+            feedforward_channels,
+            num_ffn_fcs,
+            act_cfg=ffn_act_cfg,
+            dropout=dropout)
+        self.ffn_norm = build_norm_layer(dict(type='LN'), in_channels)[1]
+
+        # cls
+        self.cls_fcs = nn.ModuleList()
+        for _ in range(num_cls_fcs):
+            self.cls_fcs.append(
+                nn.Linear(in_channels, in_channels, bias=False))
+            self.cls_fcs.append(
+                build_norm_layer(dict(type='LN'), in_channels)[1])
+            self.cls_fcs.append(
+                build_activation_layer(dict(type='ReLU', inplace=True)))
+        # reg
+        self.reg_fcs = nn.ModuleList()
+        for _ in range(num_reg_fcs):
+            self.reg_fcs.append(
+                nn.Linear(in_channels, in_channels, bias=False))
+            self.reg_fcs.append(
+                build_norm_layer(dict(type='LN'), in_channels)[1])
+            self.reg_fcs.append(
+                build_activation_layer(dict(type='ReLU', inplace=True)))
+        # cnt
+        self.cnt_fcs = nn.ModuleList()
+        for _ in range(num_cnt_fcs):
+            self.cnt_fcs.append(
+                nn.Linear(in_channels, in_channels, bias=False))
+            self.cnt_fcs.append(
+                build_norm_layer(dict(type='LN'), in_channels)[1])
+            self.cnt_fcs.append(
+                build_activation_layer(dict(type='ReLU', inplace=True)))
+
+        # overload the FC in BBoxHead
+        # cls
+        if self.loss_cls.use_sigmoid:
+            self.fc_cls = nn.Linear(in_channels, self.num_classes)
+        else:
+            self.fc_cls = nn.Linear(in_channels, self.num_classes + 1)
+        # reg
+        self.fc_reg = nn.Linear(in_channels, 4)
+        # cnt
+        if self.loss_cnt.use_sigmoid:
+            self.fc_cnt = nn.Linear(in_channels, self.num_counts)
+        else:
+            self.fc_cnt = nn.Linear(in_channels, self.num_counts + 1)
+
+        assert self.reg_class_agnostic, 'DIIHead only ' \
+            'suppport `reg_class_agnostic=True` '
+        assert self.reg_decoded_bbox, 'DIIHead only ' \
+            'suppport `reg_decoded_bbox=True`'
+
+    def init_weights(self):
+        super(DIIHeadWithCount, self).init_weights()
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
+            else:
+                pass
+        if self.loss_cls.use_sigmoid:
+            bias_init = bias_init_with_prob(0.01)
+            nn.init.constant_(self.fc_cls.bias, bias_init)
+        if self.loss_cnt.use_sigmoid:
+            bias_init = bias_init_with_prob(0.01)
+            nn.init.constant_(self.fc_cnt.bias, bias_init)
+
+    @auto_fp16()
+    def forward(self, roi_feat, proposal_feat):
+        N, num_proposals = proposal_feat.shape[:2]
+
+        # Self attention
+        proposal_feat = proposal_feat.permute(1, 0, 2)
+        proposal_feat = self.attention_norm(self.attention(proposal_feat))
+        attn_feats = proposal_feat.permute(1, 0, 2)
+
+        # instance interactive
+        proposal_feat = attn_feats.reshape(-1, self.in_channels)
+        proposal_feat_iic = self.instance_interactive_conv(
+            proposal_feat, roi_feat)
+        proposal_feat = proposal_feat + self.instance_interactive_conv_dropout(
+            proposal_feat_iic)
+        obj_feat = self.instance_interactive_conv_norm(proposal_feat)
+
+        # FFN
+        obj_feat = self.ffn_norm(self.ffn(obj_feat))
+
+        cls_feat = obj_feat
+        reg_feat = obj_feat
+        cnt_feat = obj_feat
+        for cls_layer in self.cls_fcs:
+            cls_feat = cls_layer(cls_feat)
+        for reg_layer in self.reg_fcs:
+            reg_feat = reg_layer(reg_feat)
+        for cnt_layer in self.cnt_fcs:
+            cnt_feat = cnt_layer(cnt_feat)
+
+        cls_score = self.fc_cls(cls_feat).view(
+            N, num_proposals, self.num_classes
+            if self.loss_cls.use_sigmoid else self.num_classes + 1)
+        bbox_delta = self.fc_reg(reg_feat).view(N, num_proposals, 4)
+        cnt_score = self.fc_cnt(cnt_feat).view(
+            N, num_proposals, self.num_counts
+            if self.loss_cnt.use_sigmoid else self.num_counts + 1)
+
+        return cls_score, bbox_delta, cnt_score, obj_feat.view(
+            N, num_proposals, self.in_channels), attn_feats
+
+    @force_fp32(apply_to=('cls_score', 'bbox_pred', 'cnt_score'))
+    def loss(self,
+             cls_score,
+             bbox_pred,
+             cnt_score,
+             labels,
+             label_weights,
+             bbox_targets,
+             bbox_weights,
+             counts,
+             count_weights,
+             imgs_whwh=None,
+             reduction_override=None,
+             **kwargs):
+        losses = dict()
+        bg_class_ind = self.num_classes
+        pos_inds = (labels >= 0) & (labels < bg_class_ind)
+        num_pos = pos_inds.sum().float()
+        avg_factor = reduce_mean(num_pos)       # num_gt == num_pos in sparse rcnn
+
+        # cls
+        if cls_score is not None:
+            if cls_score.numel() > 0:
+                losses['loss_cls'] = self.loss_cls(
+                    cls_score,
+                    labels,
+                    label_weights,
+                    avg_factor=avg_factor,
+                    reduction_override=reduction_override)
+                losses['pos_acc'] = accuracy(cls_score[pos_inds], labels[pos_inds])
+        # bbox
+        if bbox_pred is not None:
+            if pos_inds.any():
+                pos_bbox_pred = bbox_pred.reshape(bbox_pred.size(0),
+                                                  4)[pos_inds.type(torch.bool)]
+                imgs_whwh = imgs_whwh.reshape(bbox_pred.size(0),
+                                              4)[pos_inds.type(torch.bool)]
+                losses['loss_bbox'] = self.loss_bbox(
+                    pos_bbox_pred / imgs_whwh,
+                    bbox_targets[pos_inds.type(torch.bool)] / imgs_whwh,
+                    bbox_weights[pos_inds.type(torch.bool)],
+                    avg_factor=avg_factor)
+                losses['loss_iou'] = self.loss_iou(
+                    pos_bbox_pred,
+                    bbox_targets[pos_inds.type(torch.bool)],
+                    bbox_weights[pos_inds.type(torch.bool)],
+                    avg_factor=avg_factor)
+            else:
+                losses['loss_bbox'] = bbox_pred.sum() * 0
+                losses['loss_iou'] = bbox_pred.sum() * 0
+        # cnt
+        if cnt_score is not None:
+            if cnt_score.numel() > 0:
+                losses['loss_cnt'] = self.loss_cnt(
+                    cnt_score,
+                    counts,
+                    count_weights,
+                    avg_factor=avg_factor,
+                    reduction_override=reduction_override)
+                losses['pos_acc_cnt'] = 100. * cnt_accuracy(cnt_score[pos_inds], counts[pos_inds])
+        return losses
+
+    def _get_target_single(self, pos_inds, neg_inds, pos_bboxes, neg_bboxes,
+                           pos_gt_bboxes, pos_gt_labels, pos_gt_counts, cfg):
+        num_pos = pos_bboxes.size(0)
+        num_neg = neg_bboxes.size(0)
+        num_samples = num_pos + num_neg
+
+        labels = pos_bboxes.new_full((num_samples, ),
+                                     self.num_classes,          # FG cat_id = [0, num_classes-1]
+                                     dtype=torch.long)
+        label_weights = pos_bboxes.new_zeros(num_samples)
+        bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
+        bbox_weights = pos_bboxes.new_zeros(num_samples, 4)
+        counts = pos_bboxes.new_full((num_samples, ),
+                                     0,                         # FG cnt_id = [1, num_counts]
+                                     dtype=torch.long)
+        count_weights = pos_bboxes.new_zeros(num_samples)
+
+        if num_pos > 0:
+            labels[pos_inds] = pos_gt_labels
+            counts[pos_inds] = pos_gt_counts
+            pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
+            label_weights[pos_inds] = pos_weight
+            count_weights[pos_inds] = pos_weight
+            if not self.reg_decoded_bbox:
+                pos_bbox_targets = self.bbox_coder.encode(
+                    pos_bboxes, pos_gt_bboxes)
+            else:
+                pos_bbox_targets = pos_gt_bboxes
+            bbox_targets[pos_inds, :] = pos_bbox_targets
+            bbox_weights[pos_inds, :] = 1
+        if num_neg > 0:
+            label_weights[neg_inds] = 1.0
+            count_weights[neg_inds] = 1.0
+
+        return labels, label_weights, bbox_targets, bbox_weights, counts, count_weights
+
+    def get_targets(self,
+                    sampling_results,
+                    gt_bboxes,
+                    gt_labels,
+                    gt_counts,
+                    rcnn_train_cfg,
+                    concat=True):
+        pos_inds_list = [res.pos_inds for res in sampling_results]
+        neg_inds_list = [res.neg_inds for res in sampling_results]
+        pos_bboxes_list = [res.pos_bboxes for res in sampling_results]
+        neg_bboxes_list = [res.neg_bboxes for res in sampling_results]
+        pos_gt_bboxes_list = [res.pos_gt_bboxes for res in sampling_results]
+        pos_gt_labels_list = [res.pos_gt_labels for res in sampling_results]
+        pos_gt_counts_list = [res.pos_gt_counts for res in sampling_results]
+
+        labels, label_weights, bbox_targets, bbox_weights, counts, count_weights = multi_apply(
+            self._get_target_single,
+            pos_inds_list,
+            neg_inds_list,
+            pos_bboxes_list,
+            neg_bboxes_list,
+            pos_gt_bboxes_list,
+            pos_gt_labels_list,
+            pos_gt_counts_list,
+            cfg=rcnn_train_cfg)
+        if concat:
+            labels = torch.cat(labels, 0)
+            label_weights = torch.cat(label_weights, 0)
+            bbox_targets = torch.cat(bbox_targets, 0)
+            bbox_weights = torch.cat(bbox_weights, 0)
+            counts = torch.cat(counts, 0)
+            count_weights = torch.cat(count_weights, 0)
+        return labels, label_weights, bbox_targets, bbox_weights, counts, count_weights

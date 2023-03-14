@@ -681,7 +681,10 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
         assert len(bbox_roi_extractor) == len(bbox_head) == self.num_stages
 
         for i, (roi_extractor, head) in enumerate(zip(bbox_roi_extractor, bbox_head)):
-            head.update(current_stage=i, num_stages=self.num_stages, base=self.base)
+            # pass parameters to bbox head.
+            head.update(current_stage=i,
+                        num_stages=self.num_stages,
+                        base=self.base)
             self.bbox_roi_extractor.append(build_roi_extractor(roi_extractor))
             self.bbox_head.append(build_head(head))
 
@@ -832,8 +835,8 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
 
         if rois.shape[0] == 0:
             bbox_results = [[
-                np.zeros((0, 5), dtype=np.float32)
-                for _ in range(self.bbox_head[-1].num_classes)
+                [np.zeros((0, 6), dtype=np.float32) for i in range(self.bbox_head[-1].num_counts + 1)]
+                for j in range(self.bbox_head[-1].num_classes)
             ]] * num_imgs
 
             if self.with_mask:
@@ -857,12 +860,12 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
 
             rois = rois.split(num_proposals_per_img, 0)
             cls_score = cls_score.split(num_proposals_per_img, 0)
+            cnt_score = cnt_score.split(num_proposals_per_img, 0)
             if isinstance(bbox_pred, torch.Tensor):
                 bbox_pred = bbox_pred.split(num_proposals_per_img, 0)
             else:
                 bbox_pred = self.bbox_head[i].bbox_pred_split(
                     bbox_pred, num_proposals_per_img)
-            cnt_score = cnt_score.split(num_proposals_per_img, 0)
 
             ms_scores.append(cls_score)
             ms_cnt_scores.append(cnt_score)

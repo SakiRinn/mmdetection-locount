@@ -35,7 +35,7 @@ from .scnet import SCNet
 from .single_stage import SingleStageDetector, SingleStageDetectorWithCount
 from .solo import SOLO
 from .solov2 import SOLOv2
-from .sparse_rcnn import SparseRCNN
+from .sparse_rcnn import SparseRCNN, SparseRCNNWithCount
 from .tood import TOOD
 from .trident_faster_rcnn import TridentFasterRCNN
 from .two_stage import TwoStageDetector, TwoStageDetectorWithCount
@@ -58,5 +58,5 @@ __all__ = [
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
     'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
     'FCOSWithCount', 'RepPointsDetectorWithCount', 'DETRWithCount',
-    'DeformableDETRWithCount'
+    'DeformableDETRWithCount', 'SparseRCNNWithCount'
 ]
