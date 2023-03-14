@@ -644,11 +644,11 @@ class DIIHeadWithCount(BBoxHeadWithCount):
                     count_weights,
                     avg_factor=avg_factor,
                     reduction_override=reduction_override)
-                losses['pos_acc_cnt'] = cnt_accuracy(cnt_score[pos_inds], counts[pos_inds])
+                losses['pos_acc_cnt'] = 100. * cnt_accuracy(cnt_score[pos_inds], counts[pos_inds])
         return losses
 
     def _get_target_single(self, pos_inds, neg_inds, pos_bboxes, neg_bboxes,
-                           pos_gt_bboxes, pos_gt_labels, cfg):
+                           pos_gt_bboxes, pos_gt_labels, pos_gt_counts, cfg):
         num_pos = pos_bboxes.size(0)
         num_neg = neg_bboxes.size(0)
         num_samples = num_pos + num_neg
@@ -666,6 +666,7 @@ class DIIHeadWithCount(BBoxHeadWithCount):
 
         if num_pos > 0:
             labels[pos_inds] = pos_gt_labels
+            counts[pos_inds] = pos_gt_counts
             pos_weight = 1.0 if cfg.pos_weight <= 0 else cfg.pos_weight
             label_weights[pos_inds] = pos_weight
             count_weights[pos_inds] = pos_weight
