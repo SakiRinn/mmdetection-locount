@@ -14,4 +14,4 @@ class DeformableDETR(DETR):
 class DeformableDETRWithCount(DETRWithCount):
 
     def __init__(self, *args, **kwargs):
-        super(DETR, self).__init__(*args, **kwargs)
+        super(DETR, self).__init__(*args, **kwargs)     # Not a bug! Compatible with multi-inheritance.
