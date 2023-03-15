@@ -431,6 +431,7 @@ class SparseRoIHeadWithCount(CascadeRoIHeadWithCount, SparseRoIHead):
                  num_stages=6,
                  stage_loss_weights=(1, 1, 1, 1, 1, 1),
                  count_loss_weights=(0.1, 0.1, 0.1, 0.1, 0.1, 0.1),
+                 base=-1,
                  proposal_feature_channel=256,
                  bbox_roi_extractor=dict(
                      type='SingleRoIExtractor',
@@ -465,12 +466,14 @@ class SparseRoIHeadWithCount(CascadeRoIHeadWithCount, SparseRoIHead):
         self.num_stages = num_stages
         self.stage_loss_weights = stage_loss_weights
         self.count_loss_weights = count_loss_weights
+        self.base = base
         self.proposal_feature_channel = proposal_feature_channel
 
         super(SparseRoIHeadWithCount, self).__init__(
             num_stages,
             stage_loss_weights,
             count_loss_weights,
+            base,
             bbox_roi_extractor=bbox_roi_extractor,
             mask_roi_extractor=mask_roi_extractor,
             bbox_head=bbox_head,
@@ -651,8 +654,8 @@ class SparseRoIHeadWithCount(CascadeRoIHeadWithCount, SparseRoIHead):
             counts_per_img = counts_per_img + 1
             cnt_scores_per_img, counts_per_img = cnt_scores_per_img[..., None], counts_per_img[..., None]
             # NOTE: Use label indices to get corresponding counts.
-            cnt_scores_per_img = cnt_scores_per_img.expand(-1, self.num_classes).reshape(-1)[topk_indices]
-            counts_per_img = counts_per_img.expand(-1, self.num_classes).reshape(-1)[topk_indices]
+            cnt_scores_per_img = cnt_scores_per_img.expand(-1, num_classes).reshape(-1)[topk_indices]
+            counts_per_img = counts_per_img.expand(-1, num_classes).reshape(-1)[topk_indices]
 
             if rescale:
                 scale_factor = img_metas[img_id]['scale_factor']

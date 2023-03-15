@@ -638,7 +638,7 @@ class CascadeRoIHeadWithCount(BBoxTestMixinWithCount, CascadeRoIHead):
                  num_stages,
                  stage_loss_weights,
                  count_loss_weights,
-                 base=2,
+                 base=-1,
                  bbox_roi_extractor=None,
                  bbox_head=None,
                  mask_roi_extractor=None,
