@@ -484,11 +484,12 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
         loss_dict = dict()
         if enc_cls_scores is not None and enc_cnt_scores is not None:
             binary_labels_list = [
-                torch.zeros_like(gt_labels_list[i])
+                torch.zeros_like(gt_labels_list[i])     # 0 means FG.
                 for i in range(len(img_metas))
             ]
             binary_counts_list = [
-                torch.zeros_like(gt_counts_list[i])
+                torch.full_like(gt_counts_list[i],      # 0 means BG, so we set `max_counts` as FG.
+                                self.cnt_out_channels - 1)
                 for i in range(len(img_metas))
             ]
             enc_loss_cls, enc_losses_bbox, enc_losses_iou, enc_losses_cnt = \

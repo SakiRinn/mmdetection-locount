@@ -42,7 +42,7 @@ from .two_stage import TwoStageDetector, TwoStageDetectorWithCount
 from .vfnet import VFNet
 from .yolact import YOLACT
 from .yolo import YOLOV3
-from .yolof import YOLOF
+from .yolof import YOLOF, YOLOFWithCount
 from .yolox import YOLOX
 
 __all__ = [
@@ -58,5 +58,5 @@ __all__ = [
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
     'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
     'FCOSWithCount', 'RepPointsDetectorWithCount', 'DETRWithCount',
-    'DeformableDETRWithCount', 'SparseRCNNWithCount'
+    'DeformableDETRWithCount', 'SparseRCNNWithCount', 'YOLOFWithCount'
 ]

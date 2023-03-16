@@ -4,7 +4,7 @@ _base_ = [
     '../_base_/default_runtime.py'
 ]
 model = dict(
-    type='YOLOF',
+    type='YOLOFWithCount',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -86,11 +86,11 @@ train_pipeline = [
     dict(type='LoadAnnotations', with_bbox=True),
     dict(type='Resize', img_scale=(1333, 800), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
-    dict(type='RandomShift', shift_ratio=0.5, max_shift_px=32),
+    dict(type='RandomShiftWithCount', shift_ratio=0.5, max_shift_px=32),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels'])
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels', 'gt_counts'])
 ]
 test_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -108,13 +108,11 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=8,
-    workers_per_gpu=8,
+    samples_per_gpu=4,
+    workers_per_gpu=2,
     train=dict(pipeline=train_pipeline),
     val=dict(pipeline=test_pipeline),
     test=dict(pipeline=test_pipeline))
 
-# NOTE: `auto_scale_lr` is for automatically scaling LR,
-# USER SHOULD NOT CHANGE ITS VALUES.
-# base_batch_size = (8 GPUs) x (8 samples per GPU)
-auto_scale_lr = dict(base_batch_size=64)
+# NOTE base_batch_size = GPUs x samples_per_gpu
+auto_scale_lr = dict(base_batch_size=16)
