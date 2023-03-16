@@ -12,7 +12,7 @@ from .point_assigner import PointAssigner, PointAssignerWithCount
 from .region_assigner import RegionAssigner
 from .sim_ota_assigner import SimOTAAssigner
 from .task_aligned_assigner import TaskAlignedAssigner
-from .uniform_assigner import UniformAssigner
+from .uniform_assigner import UniformAssigner, UniformAssignerWithCount
 
 __all__ = [
     'BaseAssigner', 'MaxIoUAssigner', 'ApproxMaxIoUAssigner', 'AssignResult',
@@ -20,5 +20,6 @@ __all__ = [
     'HungarianAssigner', 'RegionAssigner', 'UniformAssigner', 'SimOTAAssigner',
     'TaskAlignedAssigner', 'MaskHungarianAssigner',
     'AssignResultWithCount', 'BaseAssignerWithCount',
-    'MaxIoUAssignerWithCount', 'PointAssignerWithCount', 'HungarianAssignerWithCount'
+    'MaxIoUAssignerWithCount', 'PointAssignerWithCount', 'HungarianAssignerWithCount',
+    'UniformAssignerWithCount'
 ]

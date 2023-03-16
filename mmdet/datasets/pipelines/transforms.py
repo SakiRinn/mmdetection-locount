@@ -2969,6 +2969,70 @@ class CopyPaste:
 
 
 @PIPELINES.register_module()
+class RandomShiftWithCount(RandomShift):
+
+    def __init__(self, shift_ratio=0.5, max_shift_px=32, filter_thr_px=1):
+        super().__init__(shift_ratio,
+                         max_shift_px,
+                         filter_thr_px)
+        self.bbox2count = {
+            'gt_bboxes': 'gt_counts',
+            'gt_bboxes_ignore': 'gt_counts_ignore'
+        }
+
+    def __call__(self, results):
+        if random.random() < self.shift_ratio:
+            img_shape = results['img'].shape[:2]
+
+            random_shift_x = random.randint(-self.max_shift_px,
+                                            self.max_shift_px)
+            random_shift_y = random.randint(-self.max_shift_px,
+                                            self.max_shift_px)
+            new_x = max(0, random_shift_x)
+            ori_x = max(0, -random_shift_x)
+            new_y = max(0, random_shift_y)
+            ori_y = max(0, -random_shift_y)
+
+            # TODO: support mask and semantic segmentation maps.
+            for key in results.get('bbox_fields', []):
+                bboxes = results[key].copy()
+                bboxes[..., 0::2] += random_shift_x
+                bboxes[..., 1::2] += random_shift_y
+
+                bboxes[..., 0::2] = np.clip(bboxes[..., 0::2], 0, img_shape[1])
+                bboxes[..., 1::2] = np.clip(bboxes[..., 1::2], 0, img_shape[0])
+
+                bbox_w = bboxes[..., 2] - bboxes[..., 0]
+                bbox_h = bboxes[..., 3] - bboxes[..., 1]
+                valid_inds = (bbox_w > self.filter_thr_px) & (
+                    bbox_h > self.filter_thr_px)
+                if key == 'gt_bboxes' and not valid_inds.any():
+                    return results
+                bboxes = bboxes[valid_inds]
+                results[key] = bboxes
+
+                # crop img_metas
+                label_key = self.bbox2label.get(key)
+                count_key = self.bbox2count.get(key)
+                if label_key in results:
+                    results[label_key] = results[label_key][valid_inds]
+                if count_key in results:
+                    results[count_key] = results[count_key][valid_inds]
+
+            for key in results.get('img_fields', ['img']):
+                img = results[key]
+                new_img = np.zeros_like(img)
+                img_h, img_w = img.shape[:2]
+                new_h = img_h - np.abs(random_shift_y)
+                new_w = img_w - np.abs(random_shift_x)
+                new_img[new_y:new_y + new_h, new_x:new_x + new_w] \
+                    = img[ori_y:ori_y + new_h, ori_x:ori_x + new_w]
+                results[key] = new_img
+
+        return results
+
+
+@PIPELINES.register_module()
 class RandomCropWithCount(RandomCrop):
 
     def __init__(self,
@@ -3017,7 +3081,7 @@ class RandomCropWithCount(RandomCrop):
                 return None
             results[key] = bboxes[valid_inds, :]
 
-            # Crop img_metas
+            # crop img_metas
             label_key = self.bbox2label.get(key)
             count_key = self.bbox2count.get(key)
             mask_key = self.bbox2mask.get(key)

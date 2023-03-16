@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from ..builder import DETECTORS
-from .single_stage import SingleStageDetector
+from .single_stage import SingleStageDetector, SingleStageDetectorWithCount
 
 
 @DETECTORS.register_module()
@@ -17,3 +17,17 @@ class YOLOF(SingleStageDetector):
                  pretrained=None):
         super(YOLOF, self).__init__(backbone, neck, bbox_head, train_cfg,
                                     test_cfg, pretrained)
+
+
+@DETECTORS.register_module()
+class YOLOFWithCount(SingleStageDetectorWithCount):
+
+    def __init__(self,
+                 backbone,
+                 neck,
+                 bbox_head,
+                 train_cfg=None,
+                 test_cfg=None,
+                 pretrained=None):
+        super(YOLOFWithCount, self).__init__(backbone, neck, bbox_head, train_cfg,
+                                             test_cfg, pretrained)

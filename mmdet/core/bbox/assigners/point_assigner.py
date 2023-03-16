@@ -158,7 +158,7 @@ class PointAssignerWithCount(PointAssigner, BaseAssignerWithCount):
                 assigned_counts = None
             else:
                 assigned_counts = points.new_full((num_points, ),
-                                                  -1,
+                                                  0,        # XXX: Only labels can be set to -1 as ignore.
                                                   dtype=torch.long)
             return AssignResultWithCount(
                 num_gts, assigned_gt_inds, None,
