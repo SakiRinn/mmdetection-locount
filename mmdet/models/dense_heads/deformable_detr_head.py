@@ -489,7 +489,7 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
             ]
             binary_counts_list = [
                 torch.full_like(gt_counts_list[i],      # 0 means BG, so we set `max_counts` as FG.
-                                self.num_counts - 1 if self.loss_cls.use_sigmoid else self.num_counts)
+                                self.cnt_out_channels - 1)
                 for i in range(len(img_metas))
             ]
             enc_loss_cls, enc_losses_bbox, enc_losses_iou, enc_losses_cnt = \
