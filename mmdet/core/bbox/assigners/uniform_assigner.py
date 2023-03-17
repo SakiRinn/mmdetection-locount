@@ -161,7 +161,7 @@ class UniformAssignerWithCount(BaseAssignerWithCount):
                                               0,
                                               dtype=torch.long)
         assigned_labels = bbox_pred.new_full((num_bboxes, ),
-                                             -1,        # XXX: Only labels can be set to -1 as ignore.
+                                             -1,                    # XXX: Only labels can be set to -1 as ignore.
                                              dtype=torch.long)
         assigned_counts = bbox_pred.new_full((num_bboxes, ),
                                              0,
@@ -218,16 +218,19 @@ class UniformAssignerWithCount(BaseAssignerWithCount):
         pos_gt_index_with_ignore[pos_ignore_idx] = -1
         assigned_gt_inds[indexes] = pos_gt_index_with_ignore
 
-        if gt_labels is not None and gt_counts is not None:
-            assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
-            assigned_counts = assigned_gt_inds.new_full((num_bboxes, ), 0)
-            pos_inds = torch.nonzero(
-                assigned_gt_inds > 0, as_tuple=False).squeeze()
+        if gt_labels is not None:
+            assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)     # XXX: Only labels can be set to -1 as ignore.
+            pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
-                assigned_counts[pos_inds] = gt_counts[assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
+        if gt_counts is not None:
+            assigned_counts = assigned_gt_inds.new_full((num_bboxes, ), 0)
+            pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_counts[pos_inds] = gt_counts[assigned_gt_inds[pos_inds] - 1]
+        else:
             assigned_counts = None
 
         assign_result = AssignResultWithCount(
@@ -237,8 +240,6 @@ class UniformAssignerWithCount(BaseAssignerWithCount):
             labels=assigned_labels,
             counts=assigned_counts)
         assign_result.set_extra_property('pos_idx', ~pos_ignore_idx)
-        assign_result.set_extra_property('pos_predicted_boxes',
-                                         bbox_pred[indexes])
-        assign_result.set_extra_property('target_boxes',
-                                         gt_bboxes[pos_gt_index])
+        assign_result.set_extra_property('pos_predicted_boxes', bbox_pred[indexes])
+        assign_result.set_extra_property('target_boxes', gt_bboxes[pos_gt_index])
         return assign_result

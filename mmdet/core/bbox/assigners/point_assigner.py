@@ -152,13 +152,13 @@ class PointAssignerWithCount(PointAssigner, BaseAssignerWithCount):
                 assigned_labels = None
             else:
                 assigned_labels = points.new_full((num_points, ),
-                                                  -1,
+                                                  -1,                   # XXX: Only labels can be set to -1 as ignore.
                                                   dtype=torch.long)
             if gt_counts is None:
                 assigned_counts = None
             else:
                 assigned_counts = points.new_full((num_points, ),
-                                                  0,        # XXX: Only labels can be set to -1 as ignore.
+                                                  0,
                                                   dtype=torch.long)
             return AssignResultWithCount(
                 num_gts, assigned_gt_inds, None,
@@ -197,14 +197,14 @@ class PointAssignerWithCount(PointAssigner, BaseAssignerWithCount):
             assigned_gt_dist[min_dist_points_index] = min_dist[less_than_recorded_index]
 
         if gt_labels is not None:
-            assigned_labels = assigned_gt_inds.new_full((num_points, ), -1)
+            assigned_labels = assigned_gt_inds.new_full((num_points, ), -1)     # XXX: Only labels can be set to -1 as ignore.
             pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
             if pos_inds.numel() > 0:
                 assigned_labels[pos_inds] = gt_labels[assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
         if gt_counts is not None:
-            assigned_counts = assigned_gt_inds.new_full((num_points, ), -1)
+            assigned_counts = assigned_gt_inds.new_full((num_points, ), 0)
             pos_inds = torch.nonzero(assigned_gt_inds > 0, as_tuple=False).squeeze()
             if pos_inds.numel() > 0:
                 assigned_counts[pos_inds] = gt_counts[assigned_gt_inds[pos_inds] - 1]
