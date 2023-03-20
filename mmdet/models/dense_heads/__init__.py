@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .anchor_free_head import AnchorFreeHead, AnchorFreeHeadWithCount
 from .anchor_head import AnchorHead, AnchorHeadWithCount
-from .atss_head import ATSSHead
+from .atss_head import ATSSHead, ATSSHeadWithCount
 from .autoassign_head import AutoAssignHead
 from .cascade_rpn_head import CascadeRPNHead, StageCascadeRPNHead
 from .centernet_head import CenterNetHead
@@ -57,5 +57,5 @@ __all__ = [
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
     'AnchorHeadWithCount', 'AnchorFreeHeadWithCount',
     'RetinaHeadWithCount', 'FCOSHeadWithCount', 'RepPointsHeadWithCount',
-    'DETRHeadWithCount', 'DeformableDETRHeadWithCount'
+    'DETRHeadWithCount', 'DeformableDETRHeadWithCount', 'ATSSHeadWithCount'
 ]

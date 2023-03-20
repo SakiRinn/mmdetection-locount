@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/coco_LHC.py',
-    '../_base_/schedules/schedule_1x.py',
+    '../_base_/schedules/schedule_1x_old.py',
     '../_base_/default_runtime.py'
 ]
 model = dict(
@@ -79,5 +79,3 @@ model = dict(
         nms=dict(type='nms', iou_threshold=0.5),
         max_per_img=100))
 optimizer = dict(lr=0.01)
-optimizer_config = dict(_delete_=True,
-                        grad_clip=dict(max_norm=35, norm_type=2))   # If not clip, loss=NaN will happen.

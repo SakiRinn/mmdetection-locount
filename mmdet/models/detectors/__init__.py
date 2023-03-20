@@ -23,7 +23,7 @@ from .mask_rcnn import MaskRCNN
 from .mask_scoring_rcnn import MaskScoringRCNN
 from .maskformer import MaskFormer
 from .nasfcos import NASFCOS
-from .paa import PAA
+from .paa import PAA, PAAWithCount
 from .panoptic_fpn import PanopticFPN
 from .panoptic_two_stage_segmentor import TwoStagePanopticSegmentor
 from .point_rend import PointRend
@@ -54,7 +54,7 @@ __all__ = [
     'VFNet', 'DETR', 'TridentFasterRCNN', 'SparseRCNN', 'SCNet', 'SOLO',
     'SOLOv2', 'DeformableDETR', 'AutoAssign', 'YOLOF', 'CenterNet', 'YOLOX',
     'TwoStagePanopticSegmentor', 'PanopticFPN', 'QueryInst', 'LAD', 'TOOD',
-    'MaskFormer', 'DDOD', 'Mask2Former',
+    'MaskFormer', 'DDOD', 'Mask2Former', 'PAAWithCount',
     'TwoStageDetectorWithCount', 'SingleStageDetectorWithCount',
     'CascadeRCNNWithCount', 'FasterRCNNWithCount', 'RetinaNetWithCount',
     'FCOSWithCount', 'RepPointsDetectorWithCount', 'DETRWithCount',
