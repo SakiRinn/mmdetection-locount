@@ -7,7 +7,7 @@ from .cascade_rpn_head import CascadeRPNHead, StageCascadeRPNHead
 from .centernet_head import CenterNetHead
 from .centripetal_head import CentripetalHead
 from .corner_head import CornerHead
-from .ddod_head import DDODHead
+from .ddod_head import DDODHead, DDODHeadWithCount
 from .deformable_detr_head import DeformableDETRHead, DeformableDETRHeadWithCount
 from .detr_head import DETRHead, DETRHeadWithCount
 from .embedding_rpn_head import EmbeddingRPNHead
@@ -57,5 +57,6 @@ __all__ = [
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead',
     'AnchorHeadWithCount', 'AnchorFreeHeadWithCount',
     'RetinaHeadWithCount', 'FCOSHeadWithCount', 'RepPointsHeadWithCount',
-    'DETRHeadWithCount', 'DeformableDETRHeadWithCount', 'ATSSHeadWithCount'
+    'DETRHeadWithCount', 'DeformableDETRHeadWithCount', 'ATSSHeadWithCount',
+    'DDODHeadWithCount'
 ]
