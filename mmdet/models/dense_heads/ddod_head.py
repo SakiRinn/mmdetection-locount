@@ -804,7 +804,6 @@ class DDODHeadWithCount(AnchorHeadWithCount, DDODHead):
         if self.train_cfg:
             self.cls_assigner = build_assigner(self.train_cfg.assigner)
             self.reg_assigner = build_assigner(self.train_cfg.reg_assigner)
-            self.cnt_assigner = build_assigner(self.train_cfg.assigner)
             sampler_cfg = dict(type='PseudoSamplerWithCount')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self.loss_iou = build_loss(loss_iou)

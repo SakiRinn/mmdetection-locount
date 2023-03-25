@@ -927,9 +927,9 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
                 loss_cnt.pop('bg_cnt_weight')
             self.bg_cnt_weight = bg_cnt_weight
 
-        # assert
+        # assigner & sampler
         if train_cfg:
-            assert 'assigner' in train_cfg, 'assigner should be provided '\
+            assert 'assigner' in train_cfg, 'assigner should be provided ' \
                 'when train_cfg is set.'
             assigner = train_cfg['assigner']
             assert loss_cls['loss_weight'] == assigner['cls_cost']['weight'], \
@@ -1138,8 +1138,7 @@ class DETRHeadWithCount(AnchorFreeHeadWithCount, DETRHead):
 
         # NOTE: Since `bg_count_ind=0`, we must exclude them before calculating loss.
         if self.loss_cnt.use_sigmoid and self.loss_cnt.__class__.__name__ != 'FocalLoss':
-            counts = F.one_hot(counts, num_classes=self.num_counts + 1)
-            counts = counts[:, 1:]
+            counts = F.one_hot(counts, num_classes=self.num_counts + 1)[..., 1:]
         loss_cls = self.loss_cls(
             cls_scores, labels, label_weights, avg_factor=cls_avg_factor)
         loss_cnt = self.loss_cnt(

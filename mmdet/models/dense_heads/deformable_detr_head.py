@@ -8,6 +8,11 @@ from mmcv.cnn import Linear, bias_init_with_prob, constant_init
 from mmcv.runner import force_fp32
 
 from mmdet.core import multi_apply
+from mmdet.core.bbox.builder import build_assigner, build_sampler
+from mmdet.core.bbox.transforms import bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh
+from mmdet.core.utils.dist_utils import reduce_mean
+from mmdet.models.dense_heads.anchor_free_head import AnchorFreeHeadWithCount
+from mmdet.models.dense_heads.base_dense_head import BaseDenseHeadWithCount
 from mmdet.models.utils.transformer import inverse_sigmoid
 from ..builder import HEADS
 from .detr_head import DETRHead, DETRHeadWithCount
@@ -331,6 +336,26 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
         self.as_two_stage = as_two_stage
         if self.as_two_stage:
             transformer['as_two_stage'] = self.as_two_stage
+            # assigner & sampler
+            train_cfg = kwargs['train_cfg']
+            loss_cls = kwargs['loss_cls']
+            loss_bbox = kwargs['loss_bbox']
+            loss_iou = kwargs['loss_iou']
+            assert 'enc_assigner' in train_cfg, 'enc_assigner should be provided ' \
+                'when train_cfg is set nad as_two_stage is True.'
+            enc_assigner = train_cfg['enc_assigner']
+            assert loss_cls['loss_weight'] == enc_assigner['cls_cost']['weight'], \
+                'The classification weight for loss and matcher should be' \
+                'exactly the same.'
+            assert loss_bbox['loss_weight'] == enc_assigner['reg_cost'][
+                'weight'], 'The regression L1 weight for loss and matcher ' \
+                'should be exactly the same.'
+            assert loss_iou['loss_weight'] == enc_assigner['iou_cost']['weight'], \
+                'The regression iou weight for loss and matcher should be' \
+                'exactly the same.'
+            self.enc_assigner = build_assigner(enc_assigner)
+            enc_sampler_cfg = dict(type='PseudoSampler')
+            self.enc_sampler = build_sampler(enc_sampler_cfg, context=self)
 
         super(DeformableDETRHeadWithCount, self).__init__(
             *args, transformer=transformer, **kwargs)
@@ -406,14 +431,14 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
         if not self.as_two_stage:
             query_embeds = self.query_embedding.weight
         hs, init_reference, inter_references, \
-            enc_outputs_class, enc_outputs_coord, enc_outputs_count = self.transformer(
+            enc_outputs_class, enc_outputs_coord = self.transformer(
                     mlvl_feats,
                     mlvl_masks,
                     query_embeds,
                     mlvl_positional_encodings,
                     reg_branches=self.reg_branches if self.with_box_refine else None,
                     cls_branches=self.cls_branches if self.as_two_stage else None,
-                    cnt_branches=self.cnt_branches if self.as_two_stage else None
+                    # cnt_branches=self.cnt_branches if self.as_two_stage else None
             )
 
         hs = hs.permute(0, 2, 1, 3)
@@ -444,10 +469,10 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
         outputs_counts = torch.stack(outputs_counts)
         if self.as_two_stage:
             return outputs_classes, outputs_coords, outputs_counts, \
-                enc_outputs_class, enc_outputs_coord.sigmoid(), enc_outputs_count
+                enc_outputs_class, enc_outputs_coord.sigmoid()
         else:
             return outputs_classes, outputs_coords, outputs_counts, \
-                None, None, None
+                None, None
 
     @force_fp32(apply_to=('all_cls_scores_list', 'all_bbox_preds_list', 'all_cnt_scores_list'))
     def loss(self,
@@ -456,7 +481,6 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
              all_cnt_scores,
              enc_cls_scores,
              enc_bbox_preds,
-             enc_cnt_scores,
              gt_bboxes_list,
              gt_labels_list,
              gt_counts_list,
@@ -482,24 +506,18 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
             img_metas_list, all_gt_bboxes_ignore_list)
 
         loss_dict = dict()
-        if enc_cls_scores is not None and enc_cnt_scores is not None:
+        if enc_cls_scores is not None:
             binary_labels_list = [
                 torch.zeros_like(gt_labels_list[i])     # 0 means FG.
                 for i in range(len(img_metas))
             ]
-            binary_counts_list = [
-                torch.full_like(gt_counts_list[i],      # 0 means BG, so we set `max_counts` as FG.
-                                self.cnt_out_channels - 1)
-                for i in range(len(img_metas))
-            ]
-            enc_loss_cls, enc_losses_bbox, enc_losses_iou, enc_losses_cnt = \
-                self.loss_single(enc_cls_scores, enc_bbox_preds, enc_cnt_scores,
-                                 gt_bboxes_list, binary_labels_list, binary_counts_list,
-                                 img_metas, gt_bboxes_ignore)
+            enc_loss_cls, enc_losses_bbox, enc_losses_iou = \
+                self.loss_enc_single(enc_cls_scores, enc_bbox_preds,
+                                     gt_bboxes_list, binary_labels_list,
+                                     img_metas, gt_bboxes_ignore)
             loss_dict['enc_loss_cls'] = enc_loss_cls
             loss_dict['enc_loss_bbox'] = enc_losses_bbox
             loss_dict['enc_loss_iou'] = enc_losses_iou
-            loss_dict['enc_loss_cnt'] = enc_losses_cnt
 
         loss_dict['loss_cls'] = losses_cls[-1]
         loss_dict['loss_bbox'] = losses_bbox[-1]
@@ -523,7 +541,6 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
                    all_cnt_scores,
                    enc_cls_scores,
                    enc_bbox_preds,
-                   enc_cnt_scores,
                    img_metas,
                    rescale=False):
         cls_scores = all_cls_scores[-1]
@@ -541,3 +558,112 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
                                                 img_shape, scale_factor, rescale)
             result_list.append(proposals)
         return result_list
+
+    def loss_enc_single(self,
+                        cls_scores,
+                        bbox_preds,
+                        gt_bboxes_list,
+                        gt_labels_list,
+                        img_metas,
+                        gt_bboxes_ignore_list=None):
+        num_imgs = cls_scores.size(0)
+        cls_scores_list = [cls_scores[i] for i in range(num_imgs)]
+        bbox_preds_list = [bbox_preds[i] for i in range(num_imgs)]
+
+        cls_reg_targets = self.get_enc_targets(cls_scores_list, bbox_preds_list,
+                                               gt_bboxes_list, gt_labels_list,
+                                               img_metas, gt_bboxes_ignore_list)
+        (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+         num_total_pos, num_total_neg) = cls_reg_targets
+
+        labels = torch.cat(labels_list, 0)
+        label_weights = torch.cat(label_weights_list, 0)
+        bbox_targets = torch.cat(bbox_targets_list, 0)
+        bbox_weights = torch.cat(bbox_weights_list, 0)
+
+        cls_scores = cls_scores.reshape(-1, self.cls_out_channels)
+        cls_avg_factor = num_total_pos * 1.0 + \
+            num_total_neg * self.bg_cls_weight
+        if self.sync_cls_avg_factor:
+            cls_avg_factor = reduce_mean(
+                cls_scores.new_tensor([cls_avg_factor]))
+        cls_avg_factor = max(cls_avg_factor, 1)
+        loss_cls = self.loss_cls(
+            cls_scores, labels, label_weights, avg_factor=cls_avg_factor)
+
+        num_total_pos = loss_cls.new_tensor([num_total_pos])
+        num_total_pos = torch.clamp(reduce_mean(num_total_pos), min=1).item()
+
+        factors = []
+        for img_meta, bbox_pred in zip(img_metas, bbox_preds):
+            img_h, img_w, _ = img_meta['img_shape']
+            factor = bbox_pred.new_tensor([img_w, img_h, img_w,
+                                           img_h]).unsqueeze(0).repeat(
+                                               bbox_pred.size(0), 1)
+            factors.append(factor)
+        factors = torch.cat(factors, 0)
+
+        bbox_preds = bbox_preds.reshape(-1, 4)
+        bboxes = bbox_cxcywh_to_xyxy(bbox_preds) * factors
+        bboxes_gt = bbox_cxcywh_to_xyxy(bbox_targets) * factors
+
+        loss_iou = self.loss_iou(
+            bboxes, bboxes_gt, bbox_weights, avg_factor=num_total_pos)
+        loss_bbox = self.loss_bbox(
+            bbox_preds, bbox_targets, bbox_weights, avg_factor=num_total_pos)
+        return loss_cls, loss_bbox, loss_iou
+
+    def get_enc_targets(self,
+                        cls_scores_list,
+                        bbox_preds_list,
+                        gt_bboxes_list,
+                        gt_labels_list,
+                        img_metas,
+                        gt_bboxes_ignore_list=None):
+            assert gt_bboxes_ignore_list is None, \
+                'Only supports for gt_bboxes_ignore setting to None.'
+            num_imgs = len(cls_scores_list)
+            gt_bboxes_ignore_list = [
+                gt_bboxes_ignore_list for _ in range(num_imgs)
+            ]
+            (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+             pos_inds_list, neg_inds_list) = multi_apply(
+                self._get_enc_target_single, cls_scores_list, bbox_preds_list,
+                gt_bboxes_list, gt_labels_list, img_metas, gt_bboxes_ignore_list)
+            num_total_pos = sum((inds.numel() for inds in pos_inds_list))
+            num_total_neg = sum((inds.numel() for inds in neg_inds_list))
+            return (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+                    num_total_pos, num_total_neg)
+
+    def _get_enc_target_single(self,
+                           cls_score,
+                           bbox_pred,
+                           gt_bboxes,
+                           gt_labels,
+                           img_meta,
+                           gt_bboxes_ignore=None):
+        num_bboxes = bbox_pred.size(0)
+        assign_result = self.enc_assigner.assign(bbox_pred, cls_score, gt_bboxes, gt_labels,
+                                                 img_meta, gt_bboxes_ignore)
+        sampling_result = self.enc_sampler.sample(assign_result, bbox_pred, gt_bboxes)
+        pos_inds = sampling_result.pos_inds
+        neg_inds = sampling_result.neg_inds
+
+        labels = gt_bboxes.new_full((num_bboxes, ),
+                                    self.num_classes,
+                                    dtype=torch.long)
+        labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds]
+        label_weights = gt_bboxes.new_ones(num_bboxes)
+
+        bbox_targets = torch.zeros_like(bbox_pred)
+        bbox_weights = torch.zeros_like(bbox_pred)
+        bbox_weights[pos_inds] = 1.0
+        img_h, img_w, _ = img_meta['img_shape']
+
+        factor = bbox_pred.new_tensor([img_w, img_h, img_w, img_h]).unsqueeze(0)
+        pos_gt_bboxes_normalized = sampling_result.pos_gt_bboxes / factor
+        pos_gt_bboxes_targets = bbox_xyxy_to_cxcywh(pos_gt_bboxes_normalized)
+        bbox_targets[pos_inds] = pos_gt_bboxes_targets
+
+        return (labels, label_weights, bbox_targets, bbox_weights,
+                pos_inds, neg_inds)

@@ -4,7 +4,7 @@ model = dict(
         with_box_refine=True,
         as_two_stage=True,
         transformer=dict(
-            type='DeformableDetrTransformerWithCount',
+            type='DeformableDetrTransformer',
             encoder=dict(
                 type='DetrTransformerEncoder',
                 num_layers=6,
@@ -35,5 +35,29 @@ model = dict(
                     operation_order=('self_attn', 'norm', 'cross_attn', 'norm',
                                      'ffn', 'norm')))
         )
+    ),
+    train_cfg=dict(
+        enc_assigner=dict(
+            type='HungarianAssigner',
+            cls_cost=dict(type='FocalLossCost',
+                          weight=2.0),
+            reg_cost=dict(type='BBoxL1Cost',
+                          box_format='xywh',
+                          weight=5.0),
+            iou_cost=dict(type='IoUCost',
+                          iou_mode='giou',
+                          weight=2.0)),
+        assigner=dict(
+            type='HungarianAssignerWithCount',
+            cls_cost=dict(type='FocalLossCost',
+                          weight=2.0),
+            cnt_cost=dict(type='ClassificationCost',
+                          weight=0.1),
+            reg_cost=dict(type='BBoxL1Cost',
+                          box_format='xywh',
+                          weight=5.0),
+            iou_cost=dict(type='IoUCost',
+                          iou_mode='giou',
+                          weight=2.0))
     )
 )
