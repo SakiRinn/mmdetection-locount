@@ -1288,3 +1288,17 @@ class DDODHeadWithCount(AnchorHeadWithCount, DDODHead):
         return (anchors, labels, label_weights,
                 bbox_targets, bbox_weights, counts, count_weights,
                 pos_inds, neg_inds)
+
+    def get_bboxes(self,
+                   cls_scores,
+                   bbox_preds,
+                   iou_preds,
+                   cnt_scores,
+                   img_metas=None,
+                   cfg=None,
+                   rescale=False,
+                   with_nms=True,
+                   **kwargs):
+        return super(DDODHeadWithCount, self).get_bboxes(cls_scores, bbox_preds, cnt_scores,
+                                                         iou_preds, iou_preds,
+                                                         img_metas, cfg, rescale, with_nms, **kwargs)

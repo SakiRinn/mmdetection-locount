@@ -337,25 +337,26 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
         if self.as_two_stage:
             transformer['as_two_stage'] = self.as_two_stage
             # assigner & sampler
-            train_cfg = kwargs['train_cfg']
-            loss_cls = kwargs['loss_cls']
-            loss_bbox = kwargs['loss_bbox']
-            loss_iou = kwargs['loss_iou']
-            assert 'enc_assigner' in train_cfg, 'enc_assigner should be provided ' \
-                'when train_cfg is set nad as_two_stage is True.'
-            enc_assigner = train_cfg['enc_assigner']
-            assert loss_cls['loss_weight'] == enc_assigner['cls_cost']['weight'], \
-                'The classification weight for loss and matcher should be' \
-                'exactly the same.'
-            assert loss_bbox['loss_weight'] == enc_assigner['reg_cost'][
-                'weight'], 'The regression L1 weight for loss and matcher ' \
-                'should be exactly the same.'
-            assert loss_iou['loss_weight'] == enc_assigner['iou_cost']['weight'], \
-                'The regression iou weight for loss and matcher should be' \
-                'exactly the same.'
-            self.enc_assigner = build_assigner(enc_assigner)
-            enc_sampler_cfg = dict(type='PseudoSampler')
-            self.enc_sampler = build_sampler(enc_sampler_cfg, context=self)
+            if kwargs['train_cfg']:
+                train_cfg = kwargs['train_cfg']
+                loss_cls = kwargs['loss_cls']
+                loss_bbox = kwargs['loss_bbox']
+                loss_iou = kwargs['loss_iou']
+                assert 'enc_assigner' in train_cfg, 'enc_assigner should be provided ' \
+                    'when train_cfg is set nad as_two_stage is True.'
+                enc_assigner = train_cfg['enc_assigner']
+                assert loss_cls['loss_weight'] == enc_assigner['cls_cost']['weight'], \
+                    'The classification weight for loss and matcher should be' \
+                    'exactly the same.'
+                assert loss_bbox['loss_weight'] == enc_assigner['reg_cost'][
+                    'weight'], 'The regression L1 weight for loss and matcher ' \
+                    'should be exactly the same.'
+                assert loss_iou['loss_weight'] == enc_assigner['iou_cost']['weight'], \
+                    'The regression iou weight for loss and matcher should be' \
+                    'exactly the same.'
+                self.enc_assigner = build_assigner(enc_assigner)
+                enc_sampler_cfg = dict(type='PseudoSampler')
+                self.enc_sampler = build_sampler(enc_sampler_cfg, context=self)
 
         super(DeformableDETRHeadWithCount, self).__init__(
             *args, transformer=transformer, **kwargs)
@@ -378,7 +379,7 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
 
         if self.with_box_refine:
             self.cls_branches = _get_clones(fc_cls, num_pred)
-            self.cnt_branches = _get_clones(fc_cnt, num_pred)
+            self.cnt_branches = _get_clones(fc_cnt, num_pred - 1)
             self.reg_branches = _get_clones(reg_branch, num_pred)
         else:
             self.cls_branches = nn.ModuleList(
@@ -437,8 +438,7 @@ class DeformableDETRHeadWithCount(DETRHeadWithCount):
                     query_embeds,
                     mlvl_positional_encodings,
                     reg_branches=self.reg_branches if self.with_box_refine else None,
-                    cls_branches=self.cls_branches if self.as_two_stage else None,
-                    # cnt_branches=self.cnt_branches if self.as_two_stage else None
+                    cls_branches=self.cls_branches if self.as_two_stage else None
             )
 
         hs = hs.permute(0, 2, 1, 3)
