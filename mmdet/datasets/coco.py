@@ -15,7 +15,8 @@ from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
 from mmdet.core.evaluation import coco_classes
-from .api_wrappers.cnt_coco_api import COCO, COCOeval       # EDIT
+# XXX: coco_api -> cnt_coco_api
+from .api_wrappers.cnt_coco_api import COCO, COCOeval
 from .builder import DATASETS
 from .custom import CustomDataset
 
@@ -484,12 +485,15 @@ class CocoDataset(CustomDataset):
                     level=logging.ERROR)
                 break
 
-            cocoEval = COCOeval(coco_gt, coco_det, iou_type, counts=self.COUNTS)
+            try:
+                cocoEval = COCOeval(coco_gt, coco_det, iou_type, counts=self.COUNTS)
+                cocoEval.params.acThrs = ac_thrs
+            except TypeError as e:
+                cocoEval = COCOeval(coco_gt, coco_det, iou_type)
             cocoEval.params.catIds = self.cat_ids
             cocoEval.params.imgIds = self.img_ids
             cocoEval.params.maxDets = list(proposal_nums)
             cocoEval.params.iouThrs = iou_thrs
-            cocoEval.params.acThrs = ac_thrs
             # mapping of cocoEval.stats
             coco_metric_names = {
                 'mAP': 0,
@@ -513,7 +517,8 @@ class CocoDataset(CustomDataset):
 
             if metric == 'proposal':
                 cocoEval.params.useCats = 0
-                cocoEval.params.useCnts = 0
+                if hasattr(cocoEval.params, 'useCnts'):
+                    cocoEval.params.useCnts = 0
                 cocoEval.evaluate()
                 cocoEval.accumulate()
 
@@ -645,7 +650,8 @@ class CocoDataset(CustomDataset):
 
         coco_gt = self.coco
         self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
-        self.cnt_ids = coco_gt.get_cnt_ids(max_count=self.COUNTS)
+        if hasattr(coco_gt, 'get_cnt_ids'):
+            self.cnt_ids = coco_gt.get_cnt_ids(max_count=self.COUNTS)
 
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,

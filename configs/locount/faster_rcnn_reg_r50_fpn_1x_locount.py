@@ -1,5 +1,5 @@
 _base_ = [
-    'faster_rcnn_r50_fpn_1x_locount.py'
+    'faster_rcnn_cls_r50_fpn_1x_locount.py'
 ]
 model = dict(
     roi_head=dict(
